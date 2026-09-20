@@ -22,6 +22,7 @@ import { Colors } from "../../theme/colors";
 import { fetchPropertyById, PropertyItem } from "../../services/propertyService";
 import { useWishlist } from "../../context/WishlistContext";
 import { FloatingMascot } from "../../components/FloatingMascot";
+import PropertyMap from "../../components/PropertyMap";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const HERO_HEIGHT = 270;
@@ -113,6 +114,99 @@ const ALL_AMENITIES_LIST = [
 
 const REVIEW_FILTER_TAGS = ["All", "Amenities", "Stay", "Food", "Service", "View"];
 
+function formatTimeAgo(dateStr?: string) {
+  if (!dateStr) return "Recently";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const months = Math.floor(diff / (1000 * 60 * 60 * 24 * 30));
+  if (months > 0) return `${months} ${months === 1 ? "month" : "months"} ago`;
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days > 0) return `${days} ${days === 1 ? "day" : "days"} ago`;
+  return "Recently";
+}
+
+function getSpaceCategory(name = "", desc = "") {
+  const text = `${name} ${desc}`.toLowerCase();
+  if (
+    text.includes("outdoor") ||
+    text.includes("terrace") ||
+    text.includes("garden") ||
+    text.includes("lawn") ||
+    text.includes("balcony") ||
+    text.includes("patio")
+  ) {
+    return {
+      category: "Outdoor & Nature",
+      defaultFeatures: ["Open-Air Setting", "Scenic Views", "Relaxation Seating"],
+    };
+  }
+  if (
+    text.includes("pool") ||
+    text.includes("swim") ||
+    text.includes("water") ||
+    text.includes("deck")
+  ) {
+    return {
+      category: "Pool & Deck",
+      defaultFeatures: ["Private Swimming Pool", "Sun Loungers", "Deck Area"],
+    };
+  }
+  if (
+    text.includes("bed") ||
+    text.includes("room") ||
+    text.includes("suite") ||
+    text.includes("master")
+  ) {
+    return {
+      category: "Bedrooms & Suites",
+      defaultFeatures: ["Air Conditioned", "Attached Ensuite Bath", "Plush Linens"],
+    };
+  }
+  if (
+    text.includes("living") ||
+    text.includes("lounge") ||
+    text.includes("hall") ||
+    text.includes("sitting")
+  ) {
+    return {
+      category: "Living & Lounge",
+      defaultFeatures: ["Spacious Lounge", "Smart TV & Sound", "Cozy Ambience"],
+    };
+  }
+  if (
+    text.includes("kitchen") ||
+    text.includes("dining") ||
+    text.includes("bar")
+  ) {
+    return {
+      category: "Kitchen & Dining",
+      defaultFeatures: ["Dining Table", "Cookware & Cutlery", "Chef Service Access"],
+    };
+  }
+  return {
+    category: "Living Area",
+    defaultFeatures: ["Well-Maintained", "Natural Light", "Modern Furnishings"],
+  };
+}
+
+function getAmenityIcon(name: string): { icon: string; isMdi?: boolean } {
+  const n = (name || "").toLowerCase();
+  if (n.includes("wifi") || n.includes("internet")) return { icon: "wifi" };
+  if (n.includes("heat") || n.includes("geyser") || n.includes("hot water")) return { icon: "snow-outline" };
+  if (n.includes("ac") || n.includes("air condition")) return { icon: "air-conditioner", isMdi: true };
+  if (n.includes("power") || n.includes("backup") || n.includes("generator") || n.includes("inverter")) return { icon: "battery-charging-outline" };
+  if (n.includes("pool") || n.includes("swim")) return { icon: "pool", isMdi: true };
+  if (n.includes("sound") || n.includes("speaker") || n.includes("music")) return { icon: "speaker-bluetooth", isMdi: true };
+  if (n.includes("garden") || n.includes("lawn") || n.includes("nature")) return { icon: "flower-outline" };
+  if (n.includes("kitchen") || n.includes("cook") || n.includes("dining")) return { icon: "silverware-fork-knife", isMdi: true };
+  if (n.includes("tv") || n.includes("television")) return { icon: "tv-outline" };
+  if (n.includes("car") || n.includes("park")) return { icon: "car-outline" };
+  if (n.includes("caretaker") || n.includes("staff") || n.includes("service")) return { icon: "account-supervisor-outline", isMdi: true };
+  if (n.includes("bbq") || n.includes("barbecue") || n.includes("grill")) return { icon: "outdoor-lamp", isMdi: true };
+  if (n.includes("game") || n.includes("play")) return { icon: "gamepad-variant-outline", isMdi: true };
+  if (n.includes("pet")) return { icon: "paw-outline" };
+  return { icon: "checkmark-circle-outline" };
+}
+
 export default function PropertyDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -130,12 +224,10 @@ export default function PropertyDetailScreen() {
   const [reviewFilter, setReviewFilter] = useState("All");
   const [reviewSort, setReviewSort] = useState("Most Popular");
   const [isAllReviewsModalOpen, setIsAllReviewsModalOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // Amenities state
   const [showAllAmenities, setShowAllAmenities] = useState(false);
-
-  // Location Map state
-  const [mapType, setMapType] = useState<"map" | "satellite">("map");
 
   // Modals
   const [isBrochureOpen, setIsBrochureOpen] = useState(false);
@@ -194,30 +286,108 @@ export default function PropertyDetailScreen() {
 
   const cityName = property?.address?.city || property?.city || "Lonavala";
   const addressLine = property?.address?.addressLine || "Malavli";
-  const fullAddress = `${addressLine}, Boraj Road, Near Gharkul Society, ${cityName}`;
-  const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const areaName = property?.address?.area ? `, ${property.address.area}` : "";
+  const fullAddress = `${addressLine}${areaName}, Near Gharkul Society, ${cityName}`;
 
-  const dynamicMapUri = useMemo(() => {
-    if (googleMapsApiKey && googleMapsApiKey.trim().length > 0) {
-      const locQuery = encodeURIComponent(fullAddress || `${property?.name || "Villa"}, ${cityName}`);
-      const mapTypeParam = mapType === "satellite" ? "satellite" : "roadmap";
-      return `https://maps.googleapis.com/maps/api/staticmap?center=${locQuery}&zoom=14&size=640x360&scale=2&maptype=${mapTypeParam}&markers=color:red%7Clabel:V%7C${locQuery}&key=${googleMapsApiKey.trim()}`;
+  // Dynamic reviews from backend API
+  const rawReviews = useMemo(() => property?.reviews || [], [property?.reviews]);
+  const averageRating = useMemo(() => {
+    if (typeof property?.averageRating === "number" && property.averageRating > 0) {
+      return property.averageRating;
     }
-    return null;
-  }, [googleMapsApiKey, fullAddress, property?.name, cityName, mapType]);
+    if (rawReviews.length > 0) {
+      const sum = rawReviews.reduce((acc, r) => acc + (r.rating || 5), 0);
+      return Math.round(sum / rawReviews.length);
+    }
+    return 5;
+  }, [property?.averageRating, rawReviews]);
 
-  const handleOpenMapExternal = () => {
-    const query = encodeURIComponent(`${property?.name || "Villa"}, ${fullAddress}`);
-    const url = Platform.select({
-      ios: `maps:0,0?q=${query}`,
-      android: `geo:0,0?q=${query}`,
+  const totalReviewsCount = useMemo(() => {
+    return property?.totalReviews || rawReviews.length || (property ? 1 : 0);
+  }, [property?.totalReviews, rawReviews]);
+
+  const filteredReviews = useMemo(() => {
+    return rawReviews.filter((review) => {
+      if (reviewFilter === "All") return true;
+      const cats = review.categories || [];
+      return cats.some((c) => c.toLowerCase() === reviewFilter.toLowerCase());
     });
-    if (url) {
-      Linking.openURL(url).catch(() => {
-        Linking.openURL(`https://maps.google.com/?q=${query}`);
+  }, [rawReviews, reviewFilter]);
+
+  const sortedReviews = useMemo(() => {
+    return [...filteredReviews].sort((a, b) => {
+      if (reviewSort === "Most Recent") {
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      }
+      return (b.rating || 5) - (a.rating || 5);
+    });
+  }, [filteredReviews, reviewSort]);
+
+  // Dynamic Spaces list
+  const spacesList = useMemo(() => {
+    if (Array.isArray(property?.spaces) && property.spaces.length > 0) {
+      return property.spaces;
+    }
+    return SAMPLE_SPACES;
+  }, [property?.spaces]);
+
+  // Dynamic Highlights list
+  const highlightsList = useMemo(() => {
+    if (Array.isArray(property?.highlights) && property.highlights.length > 0) {
+      return property.highlights;
+    }
+    return SAMPLE_HIGHLIGHTS;
+  }, [property?.highlights]);
+
+  // Dynamic Experiences list
+  const experiencesList = useMemo(() => {
+    if (Array.isArray(property?.experiences) && property.experiences.length > 0) {
+      return property.experiences;
+    }
+    return SIGNATURE_EXPERIENCES;
+  }, [property?.experiences]);
+
+  // Dynamic Amenities list
+  const amenitiesList = useMemo(() => {
+    if (Array.isArray(property?.amenities) && property.amenities.length > 0) {
+      return property.amenities;
+    }
+    return ALL_AMENITIES_LIST.map((a) => a.label);
+  }, [property?.amenities]);
+
+  const topAmenitiesList = useMemo(() => {
+    if (Array.isArray(property?.topamenities) && property.topamenities.length > 0) {
+      return property.topamenities;
+    }
+    return ["AC", "Power Backup", "Swimming Pool", "Sound System", "Garden"];
+  }, [property?.topamenities]);
+
+  const fullAmenitiesCardList = useMemo(() => {
+    if (Array.isArray(property?.amenities) && property.amenities.length > 0) {
+      return property.amenities.map((item) => {
+        const name = typeof item === "string" ? item : (item as any)?.name || (item as any)?.title || String(item);
+        const { icon, isMdi } = getAmenityIcon(name);
+        return { icon, label: name, isMdi };
       });
     }
-  };
+    return ALL_AMENITIES_LIST;
+  }, [property?.amenities]);
+
+  // Dynamic Nearby Attractions list
+  const nearbySightseeingList = useMemo(() => {
+    if (Array.isArray(property?.nearbyattractions) && property.nearbyattractions.length > 0) {
+      return property.nearbyattractions.map((loc) => ({
+        name: loc.nearbylocation || "Sightseeing Spot",
+        distance: loc.distance ? `${loc.distance} km` : "Nearby",
+      }));
+    }
+    return [
+      { name: "Bhaje Caves", distance: "6 km" },
+      { name: "Karla caves", distance: "3 km" },
+      { name: "Pawna Lake", distance: "14 km" },
+      { name: "Lohagad Fort", distance: "10 km" },
+    ];
+  }, [property?.nearbyattractions]);
 
   if (loading) {
     return (
@@ -267,7 +437,7 @@ export default function PropertyDetailScreen() {
     `A serene getaway in ${addressLine}, ${cityName} with private swimming pool, garden area, and modern amenities. Ideal for families and groups, offering a peaceful nature-centric stay with homely food and dedicated concierge service.`;
   const descriptionText = property.description || defaultDescription;
 
-  const displayedAmenities = showAllAmenities ? ALL_AMENITIES_LIST : ALL_AMENITIES_LIST.slice(0, 8);
+  const displayedAmenities = showAllAmenities ? fullAmenitiesCardList : fullAmenitiesCardList.slice(0, 8);
 
   return (
     <View style={styles.screenContainer}>
@@ -439,12 +609,12 @@ export default function PropertyDetailScreen() {
 
             <View style={styles.starScoreRow}>
               <Ionicons name="star" size={15} color="#F59E0B" style={{ marginRight: 3 }} />
-              <Text style={styles.starScoreText}>5</Text>
+              <Text style={styles.starScoreText}>{averageRating}</Text>
               <Text style={styles.starOutOfText}> / 5</Text>
             </View>
 
             <TouchableOpacity activeOpacity={0.7} onPress={() => handleTabPress("reviews")}>
-              <Text style={styles.reviewsLink}>(1 Reviews)</Text>
+              <Text style={styles.reviewsLink}>({totalReviewsCount} Reviews)</Text>
             </TouchableOpacity>
           </View>
 
@@ -527,10 +697,10 @@ export default function PropertyDetailScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.signatureCardsScroll}
           >
-            {SIGNATURE_EXPERIENCES.map((exp, idx) => (
-              <View key={idx} style={styles.signatureCard}>
+            {experiencesList.map((exp: any, idx: number) => (
+              <View key={exp._id || idx} style={styles.signatureCard}>
                 <Image
-                  source={{ uri: exp.image }}
+                  source={{ uri: exp.image || "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80" }}
                   style={styles.signatureCardImage}
                   contentFit="cover"
                 />
@@ -539,7 +709,7 @@ export default function PropertyDetailScreen() {
                   style={styles.signatureGradient}
                 >
                   <Text style={styles.signatureTitle}>{exp.title}</Text>
-                  <Text style={styles.signatureSub}>{exp.subtitle}</Text>
+                  {exp.subtitle ? <Text style={styles.signatureSub}>{exp.subtitle}</Text> : null}
                 </LinearGradient>
               </View>
             ))}
@@ -551,10 +721,15 @@ export default function PropertyDetailScreen() {
           </View>
 
           <View style={styles.highlightsList}>
-            {SAMPLE_HIGHLIGHTS.map((item, idx) => (
-              <View key={idx} style={styles.highlightCard}>
+            {highlightsList.map((item: any, idx: number) => (
+              <TouchableOpacity
+                key={item._id || idx}
+                style={styles.highlightCard}
+                activeOpacity={0.88}
+                onPress={() => item.image && setPreviewImage(item.image)}
+              >
                 <Image
-                  source={{ uri: item.image }}
+                  source={{ uri: item.image || "https://images.unsplash.com/photo-1510798831971-661eb04b3739?w=600&q=80" }}
                   style={styles.highlightThumb}
                   contentFit="cover"
                 />
@@ -562,7 +737,7 @@ export default function PropertyDetailScreen() {
                   <Text style={styles.highlightTitle}>{item.title}</Text>
                   <Text style={styles.highlightDesc}>{item.description}</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
 
@@ -690,57 +865,59 @@ export default function PropertyDetailScreen() {
           <View style={styles.policyGrid}>
             <View style={styles.policyGridCard}>
               <Text style={styles.policyCardLabel}>🕒 CHECK-IN</Text>
-              <Text style={styles.policyCardValue}>1 PM</Text>
+              <Text style={styles.policyCardValue}>{property.checkInTime || "1 PM"}</Text>
             </View>
 
             <View style={styles.policyGridCard}>
               <Text style={styles.policyCardLabel}>🕒 CHECK-OUT</Text>
-              <Text style={styles.policyCardValue}>11 AM</Text>
+              <Text style={styles.policyCardValue}>{property.checkOutTime || "11 AM"}</Text>
             </View>
 
             <View style={styles.policyGridCard}>
               <Text style={styles.policyCardLabel}>🛡️ SECURITY DEPOSIT</Text>
-              <Text style={styles.policyCardValue}>₹3,000</Text>
+              <Text style={styles.policyCardValue}>₹{(property.securityDeposit || 3000).toLocaleString("en-IN")}</Text>
               <Text style={styles.policyCardSub}>100% Refundable</Text>
             </View>
 
             <View style={styles.policyGridCard}>
               <Text style={styles.policyCardLabel}>💵 LATE CHECKOUT</Text>
-              <Text style={styles.policyCardValue}>₹1,000/hr</Text>
+              <Text style={styles.policyCardValue}>₹{(property.lateCheckoutCharge || 1000).toLocaleString("en-IN")}/hr</Text>
               <Text style={styles.policyCardSub}>Subject to slot</Text>
             </View>
           </View>
 
           <View style={styles.ruleCard}>
             <Text style={styles.ruleCardHeader}>• Cancellation Policy</Text>
-            <View style={styles.ruleBullet}>
-              <Text style={styles.bulletDot}>•</Text>
-              <Text style={styles.bulletText}>Advance Payment will be strictly non-refundable</Text>
-            </View>
-            <View style={styles.ruleBullet}>
-              <Text style={styles.bulletDot}>•</Text>
-              <Text style={styles.bulletText}>Advance payment is strictly non-refundable after 48 hours from booking</Text>
-            </View>
-            <View style={styles.ruleBullet}>
-              <Text style={styles.bulletDot}>•</Text>
-              <Text style={styles.bulletText}>Exceptions may be considered for genuine emergencies within 48 hours of booking</Text>
-            </View>
+            {(property.cancellationPolicy && property.cancellationPolicy.length > 0
+              ? property.cancellationPolicy
+              : [
+                  "Advance Payment will be strictly non-refundable",
+                  "Advance payment is strictly non-refundable after 48 hours from booking",
+                  "Exceptions may be considered for genuine emergencies within 48 hours of booking",
+                ]
+            ).map((item: string, idx: number) => (
+              <View key={idx} style={styles.ruleBullet}>
+                <Text style={styles.bulletDot}>•</Text>
+                <Text style={styles.bulletText}>{item}</Text>
+              </View>
+            ))}
           </View>
 
           <View style={styles.ruleCard}>
             <Text style={styles.ruleCardHeader}>• House Rules</Text>
-            <View style={styles.ruleBullet}>
-              <Text style={styles.bulletDot}>•</Text>
-              <Text style={styles.bulletText}>No smoking inside the villa</Text>
-            </View>
-            <View style={styles.ruleBullet}>
-              <Text style={styles.bulletDot}>•</Text>
-              <Text style={styles.bulletText}>Smoking allowed only in outdoor areas</Text>
-            </View>
-            <View style={styles.ruleBullet}>
-              <Text style={styles.bulletDot}>•</Text>
-              <Text style={styles.bulletText}>No parties or events without prior approval</Text>
-            </View>
+            {(property.houseRules && property.houseRules.length > 0
+              ? property.houseRules.slice(0, 6)
+              : [
+                  "No smoking inside the villa",
+                  "Smoking allowed only in outdoor areas",
+                  "No parties or events without prior approval",
+                ]
+            ).map((item: string, idx: number) => (
+              <View key={idx} style={styles.ruleBullet}>
+                <Text style={styles.bulletDot}>•</Text>
+                <Text style={styles.bulletText}>{item}</Text>
+              </View>
+            ))}
           </View>
         </View>
 
@@ -757,7 +934,7 @@ export default function PropertyDetailScreen() {
               <Text style={styles.sectionHeading}>Spaces & Living Areas</Text>
             </View>
             <Text style={styles.spacesCountText}>
-              {spaceCurrentIndex + 1} of {SAMPLE_SPACES.length}
+              {spaceCurrentIndex + 1} of {spacesList.length}
             </Text>
           </View>
 
@@ -767,42 +944,58 @@ export default function PropertyDetailScreen() {
             showsHorizontalScrollIndicator={false}
             onMomentumScrollEnd={(e) => {
               const idx = Math.round(e.nativeEvent.contentOffset.x / (SCREEN_WIDTH * 0.85));
-              setSpaceCurrentIndex(Math.min(idx, SAMPLE_SPACES.length - 1));
+              setSpaceCurrentIndex(Math.min(idx, spacesList.length - 1));
             }}
             contentContainerStyle={styles.spacesScroll}
           >
-            {SAMPLE_SPACES.map((space, idx) => (
-              <View key={idx} style={styles.spaceCard}>
-                <View style={styles.spaceImageContainer}>
-                  <Image
-                    source={{ uri: space.image }}
-                    style={styles.spaceImage}
-                    contentFit="cover"
-                  />
-                  <View style={styles.spaceCategoryBadge}>
-                    <Ionicons name="home-outline" size={11} color="#FF5A1F" style={{ marginRight: 4 }} />
-                    <Text style={styles.spaceCategoryText}>{space.category}</Text>
-                  </View>
+            {spacesList.map((space: any, idx: number) => {
+              const spaceImage = space.image || space.photos?.[0] || space.photo || "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800";
+              const spaceName = space.name || space.title || "Living Space";
+              const spaceDesc = space.description || "Comfortable and spacious living area designed for relaxation.";
+              const inferred = getSpaceCategory(spaceName, spaceDesc);
+              const spaceCat = space.category || inferred.category;
+              const spaceFeatures = Array.isArray(space.features) && space.features.length > 0
+                ? space.features
+                : inferred.defaultFeatures;
 
-                  <View style={styles.viewPhotoBadge}>
-                    <Text style={styles.viewPhotoText}>View Photo</Text>
+              return (
+                <View key={idx} style={styles.spaceCard}>
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => setPreviewImage(spaceImage)}
+                    style={styles.spaceImageContainer}
+                  >
+                    <Image
+                      source={{ uri: spaceImage }}
+                      style={styles.spaceImage}
+                      contentFit="cover"
+                    />
+                    <View style={styles.spaceCategoryBadge}>
+                      <Ionicons name="home-outline" size={11} color="#FF5A1F" style={{ marginRight: 4 }} />
+                      <Text style={styles.spaceCategoryText}>{spaceCat}</Text>
+                    </View>
+
+                    <View style={styles.viewPhotoBadge}>
+                      <Ionicons name="expand-outline" size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
+                      <Text style={styles.viewPhotoText}>View Photo</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <View style={styles.spaceContent}>
+                    <Text style={styles.spaceTitle}>{spaceName}</Text>
+                    <Text style={styles.spaceDesc}>{spaceDesc}</Text>
+
+                    <View style={styles.spaceTagsRow}>
+                      {spaceFeatures.map((f: string, i: number) => (
+                        <View key={i} style={styles.spaceTag}>
+                          <Text style={styles.spaceTagText}>✓ {f}</Text>
+                        </View>
+                      ))}
+                    </View>
                   </View>
                 </View>
-
-                <View style={styles.spaceContent}>
-                  <Text style={styles.spaceTitle}>{space.name}</Text>
-                  <Text style={styles.spaceDesc}>{space.description}</Text>
-
-                  <View style={styles.spaceTagsRow}>
-                    {space.features.map((f, i) => (
-                      <View key={i} style={styles.spaceTag}>
-                        <Text style={styles.spaceTagText}>✓ {f}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </ScrollView>
         </View>
 
@@ -817,14 +1010,20 @@ export default function PropertyDetailScreen() {
           <View style={styles.reviewsSummaryCenter}>
             <View style={styles.starsRow}>
               {[1, 2, 3, 4, 5].map((s) => (
-                <Ionicons key={s} name="star" size={28} color="#FBBF24" style={{ marginHorizontal: 2 }} />
+                <Ionicons
+                  key={s}
+                  name={s <= Math.round(averageRating) ? "star" : "star-outline"}
+                  size={28}
+                  color="#FBBF24"
+                  style={{ marginHorizontal: 2 }}
+                />
               ))}
             </View>
-            <Text style={styles.bigScoreText}>5/5</Text>
+            <Text style={styles.bigScoreText}>{averageRating}/5</Text>
             <View style={styles.guestFavReviewsRow}>
               <Text style={styles.guestFavBoldText}>Guest Favourite</Text>
               <TouchableOpacity onPress={() => setIsAllReviewsModalOpen(true)}>
-                <Text style={styles.reviewCountLink}> (1 Reviews)</Text>
+                <Text style={styles.reviewCountLink}> ({totalReviewsCount} {totalReviewsCount === 1 ? "Review" : "Reviews"})</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -885,41 +1084,86 @@ export default function PropertyDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Review Card (Matching Screenshot 1) */}
-          <View style={styles.reviewCard}>
-            <View style={styles.reviewerHeader}>
-              <View style={styles.orangeAvatarCircle}>
-                <Text style={styles.orangeAvatarLetter}>S</Text>
-              </View>
-              <View style={styles.reviewerMeta}>
-                <Text style={styles.reviewTimeText}>9 months ago</Text>
-                <View style={styles.ratingScorePillRow}>
-                  <Ionicons name="star" size={13} color="#F59E0B" style={{ marginRight: 3 }} />
-                  <Text style={styles.reviewScoreVal}>5 /5</Text>
+          {/* Review Cards List */}
+          {sortedReviews.length === 0 ? (
+            <View style={{ alignItems: "center", paddingVertical: 24 }}>
+              <Ionicons name="star-outline" size={32} color="#D1D5DB" />
+              <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 6, fontWeight: "500" }}>
+                No reviews yet for this filter.
+              </Text>
+            </View>
+          ) : (
+            sortedReviews.slice(0, 3).map((rev: any, rIdx: number) => {
+              const authorName = rev.userId?.fullName || rev.userName || rev.name || "Verified Guest";
+              const initial = (authorName.trim() || "G")[0].toUpperCase();
+              const reviewTime = formatTimeAgo(rev.createdAt || rev.date);
+              const reviewRating = rev.rating || 5;
+              const reviewCats = Array.isArray(rev.categories) && rev.categories.length > 0 ? rev.categories : ["Amenities"];
+              const reviewComment = rev.comment || rev.review || "Exceptional stay!";
+              const reviewImages = Array.isArray(rev.images) ? rev.images : rev.image ? [rev.image] : [];
+
+              return (
+                <View key={rIdx} style={[styles.reviewCard, rIdx > 0 && { marginTop: 12 }]}>
+                  <View style={styles.reviewerHeader}>
+                    <View style={styles.orangeAvatarCircle}>
+                      <Text style={styles.orangeAvatarLetter}>{initial}</Text>
+                    </View>
+                    <View style={styles.reviewerMeta}>
+                      <Text style={styles.reviewerNameText}>{authorName}</Text>
+                      <Text style={styles.reviewTimeText}>{reviewTime}</Text>
+                      <View style={styles.ratingScorePillRow}>
+                        <Ionicons name="star" size={13} color="#F59E0B" style={{ marginRight: 3 }} />
+                        <Text style={styles.reviewScoreVal}>{reviewRating} /5</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                    {reviewCats.map((cat: string, cIdx: number) => (
+                      <View key={cIdx} style={styles.reviewTagBadge}>
+                        <Ionicons name="checkmark" size={11} color="#059669" style={{ marginRight: 3 }} />
+                        <Text style={styles.reviewTagBadgeText}>{cat}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  <Text style={styles.reviewBodyText}>{reviewComment}</Text>
+
+                  {/* Attached Photo Thumbnails */}
+                  {reviewImages.length > 0 && (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
+                      {reviewImages.map((imgUrl: string, imgIdx: number) => (
+                        <TouchableOpacity
+                          key={imgIdx}
+                          style={styles.reviewAttachmentThumb}
+                          activeOpacity={0.85}
+                          onPress={() => setPreviewImage(imgUrl)}
+                        >
+                          <Image
+                            source={{ uri: imgUrl }}
+                            style={styles.reviewAttachmentImg}
+                            contentFit="cover"
+                          />
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  )}
                 </View>
-              </View>
-            </View>
+              );
+            })
+          )}
 
-            <View style={styles.reviewTagBadge}>
-              <Ionicons name="checkmark" size={11} color="#059669" style={{ marginRight: 3 }} />
-              <Text style={styles.reviewTagBadgeText}>Amenities</Text>
-            </View>
-
-            <Text style={styles.reviewBodyText}>
-              Exceptional property! The swimming pool and mountain views were unbelievable. The in-house caretaker was extremely helpful.
-            </Text>
-
-            {/* Attached Photo Thumbnail */}
-            <View style={styles.reviewAttachmentThumb}>
-              <Image
-                source={{
-                  uri: "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=400&q=80",
-                }}
-                style={styles.reviewAttachmentImg}
-                contentFit="cover"
-              />
-            </View>
-          </View>
+          {sortedReviews.length > 3 && (
+            <TouchableOpacity
+              style={styles.showAllReviewsBtn}
+              onPress={() => setIsAllReviewsModalOpen(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.showAllReviewsText}>
+                View all {sortedReviews.length} reviews
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* ========================================================================= */}
@@ -934,7 +1178,7 @@ export default function PropertyDetailScreen() {
               <View style={styles.orangeBar} />
               <Text style={styles.sectionHeading}>Villa Amenities</Text>
             </View>
-            <Text style={styles.totalAmenitiesBadge}>32 Total</Text>
+            <Text style={styles.totalAmenitiesBadge}>{fullAmenitiesCardList.length} Total</Text>
           </View>
 
           {/* Top Amenities Box (Screenshot 3) */}
@@ -944,7 +1188,7 @@ export default function PropertyDetailScreen() {
               <Text style={styles.topAmenitiesHeading}>TOP AMENITIES:</Text>
             </View>
             <View style={styles.topAmenitiesPillWrap}>
-              {["AC", "Power Backup", "Swimming Pool", "Sound System", "Garden"].map((am, i) => (
+              {topAmenitiesList.map((am: string, i: number) => (
                 <View key={i} style={styles.topAmenityPill}>
                   <Text style={styles.topAmenityPillText}>✓ {am}</Text>
                 </View>
@@ -971,15 +1215,17 @@ export default function PropertyDetailScreen() {
           </View>
 
           {/* Show All Amenities Button */}
-          <TouchableOpacity
-            style={styles.showAllAmenitiesBtn}
-            onPress={() => setShowAllAmenities(!showAllAmenities)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.showAllAmenitiesText}>
-              {showAllAmenities ? "Show fewer amenities" : "Show all 32 amenities"}
-            </Text>
-          </TouchableOpacity>
+          {fullAmenitiesCardList.length > 8 && (
+            <TouchableOpacity
+              style={styles.showAllAmenitiesBtn}
+              onPress={() => setShowAllAmenities(!showAllAmenities)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.showAllAmenitiesText}>
+                {showAllAmenities ? "Show fewer amenities" : `Show all ${fullAmenitiesCardList.length} amenities`}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* ========================================================================= */}
@@ -1002,12 +1248,14 @@ export default function PropertyDetailScreen() {
                 <Text style={styles.mealPackageTitle}>Adult Meal Package</Text>
               </View>
               <View style={styles.mealPackagePriceCol}>
-                <Text style={styles.mealPackagePrice}>₹2,000</Text>
+                <Text style={styles.mealPackagePrice}>
+                  ₹{(property.foodOptions?.adultPrice || 2000).toLocaleString("en-IN")}
+                </Text>
                 <Text style={styles.mealPackageUnit}>/adult/day</Text>
               </View>
             </View>
             <Text style={styles.mealPackageDesc}>
-              Includes full course breakfast, regional lunch, evening high-tea & snacks, and gourmet dinner prepared by our chef.
+              {property.foodOptions?.note || "Includes full course breakfast, regional lunch, evening high-tea & snacks, and gourmet dinner prepared by our chef."}
             </Text>
             <View style={styles.mealFeaturesRow}>
               <Text style={styles.mealFeatureGreen}>✓ Veg & Non-Veg</Text>
@@ -1026,7 +1274,11 @@ export default function PropertyDetailScreen() {
                 <Text style={styles.mealPackageTitle}>Child Meal Package</Text>
               </View>
               <View style={styles.freeChildPill}>
-                <Text style={styles.freeChildText}>Free for Kids Under 5</Text>
+                <Text style={styles.freeChildText}>
+                  {property.foodOptions?.childPrice && property.foodOptions.childPrice > 0
+                    ? `₹${property.foodOptions.childPrice.toLocaleString("en-IN")}/child`
+                    : "Free for Kids Under 5"}
+                </Text>
               </View>
             </View>
             <Text style={styles.mealPackageDesc}>
@@ -1067,65 +1319,13 @@ export default function PropertyDetailScreen() {
             <Text style={styles.sectionHeading}>Location & Surroundings</Text>
           </View>
 
-          {/* Interactive Google Map Preview Box (Screenshot 5) */}
-          <View style={styles.mapBoxContainer}>
-            <Image
-              source={
-                dynamicMapUri
-                  ? { uri: dynamicMapUri }
-                  : mapType === "map"
-                  ? require("../../../assets/brand/google-maps.jpg")
-                  : {
-                      uri: "https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80",
-                    }
-              }
-              style={styles.mapImage}
-              contentFit="cover"
-            />
-
-            {/* Top-Left Map / Satellite Switcher */}
-            <View style={styles.mapSwitcherContainer}>
-              <TouchableOpacity
-                style={[styles.mapSwitchBtn, mapType === "map" && styles.mapSwitchBtnActive]}
-                onPress={() => setMapType("map")}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.mapSwitchText, mapType === "map" && styles.mapSwitchTextActive]}>
-                  Map
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.mapSwitchBtn, mapType === "satellite" && styles.mapSwitchBtnActive]}
-                onPress={() => setMapType("satellite")}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.mapSwitchText, mapType === "satellite" && styles.mapSwitchTextActive]}>
-                  Satellite
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Center Red Map Marker */}
-            <View style={styles.centerMapMarker}>
-              <Ionicons name="location" size={38} color="#DC2626" />
-            </View>
-
-            {/* Right Controls */}
-            <View style={styles.mapControlsRight}>
-              <TouchableOpacity style={styles.mapCircleIcon} onPress={handleOpenMapExternal}>
-                <Ionicons name="scan-outline" size={17} color="#374151" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.mapCircleIcon} onPress={handleOpenMapExternal}>
-                <Ionicons name="locate-outline" size={17} color="#374151" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Bottom Google attribution */}
-            <View style={styles.mapBottomAttribution}>
-              <Text style={styles.mapGoogleLogo}>Google</Text>
-              <Text style={styles.mapTermsText}>Map data ©2026 • Terms</Text>
-            </View>
-          </View>
+          {/* Modern Interactive Vector / Google Map Component */}
+          <PropertyMap
+            coordinates={property.coordinates || (property as any).location?.coordinates}
+            propertyName={property.name}
+            address={fullAddress}
+            height={230}
+          />
 
           {/* Full Property Address Card */}
           <View style={styles.addressInfoCard}>
@@ -1144,33 +1344,14 @@ export default function PropertyDetailScreen() {
             </View>
 
             <View style={styles.sightseeingList}>
-              <View style={styles.sightseeingItem}>
-                <Text style={styles.sightseeingItemName}>• Bhaje Caves</Text>
-                <View style={styles.distanceBadge}>
-                  <Text style={styles.distanceBadgeText}>6 km</Text>
+              {nearbySightseeingList.map((place: { name: string; distance: string }, idx: number) => (
+                <View key={idx} style={styles.sightseeingItem}>
+                  <Text style={styles.sightseeingItemName}>• {place.name}</Text>
+                  <View style={styles.distanceBadge}>
+                    <Text style={styles.distanceBadgeText}>{place.distance}</Text>
+                  </View>
                 </View>
-              </View>
-
-              <View style={styles.sightseeingItem}>
-                <Text style={styles.sightseeingItemName}>• Karla caves</Text>
-                <View style={styles.distanceBadge}>
-                  <Text style={styles.distanceBadgeText}>3 km</Text>
-                </View>
-              </View>
-
-              <View style={styles.sightseeingItem}>
-                <Text style={styles.sightseeingItemName}>• Pawna Lake</Text>
-                <View style={styles.distanceBadge}>
-                  <Text style={styles.distanceBadgeText}>14 km</Text>
-                </View>
-              </View>
-
-              <View style={styles.sightseeingItem}>
-                <Text style={styles.sightseeingItemName}>• Lohagad Fort</Text>
-                <View style={styles.distanceBadge}>
-                  <Text style={styles.distanceBadgeText}>10 km</Text>
-                </View>
-              </View>
+              ))}
             </View>
           </View>
         </View>
@@ -1216,46 +1397,76 @@ export default function PropertyDetailScreen() {
         <View style={styles.modalBackdrop}>
           <View style={styles.allReviewsModalCard}>
             <View style={styles.allReviewsHeader}>
-              <Text style={styles.allReviewsTitle}>All Reviews (1)</Text>
+              <Text style={styles.allReviewsTitle}>All Reviews ({sortedReviews.length})</Text>
               <TouchableOpacity onPress={() => setIsAllReviewsModalOpen(false)}>
                 <Ionicons name="close" size={22} color="#111827" />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={{ padding: 16 }}>
-              <View style={styles.reviewCard}>
-                <View style={styles.reviewerHeader}>
-                  <View style={styles.orangeAvatarCircle}>
-                    <Text style={styles.orangeAvatarLetter}>S</Text>
-                  </View>
-                  <View style={styles.reviewerMeta}>
-                    <Text style={styles.reviewTimeText}>9 months ago</Text>
-                    <View style={styles.ratingScorePillRow}>
-                      <Ionicons name="star" size={13} color="#F59E0B" style={{ marginRight: 3 }} />
-                      <Text style={styles.reviewScoreVal}>5 /5</Text>
+              {sortedReviews.length === 0 ? (
+                <View style={{ alignItems: "center", paddingVertical: 24 }}>
+                  <Text style={{ color: "#6B7280", fontSize: 13 }}>No reviews yet for this stay.</Text>
+                </View>
+              ) : (
+                sortedReviews.map((rev: any, idx: number) => {
+                  const authorName = rev.userId?.fullName || rev.userName || rev.name || "Verified Guest";
+                  const initial = (authorName.trim() || "G")[0].toUpperCase();
+                  const reviewDate = formatTimeAgo(rev.createdAt || rev.date);
+                  const reviewRating = rev.rating || 5;
+                  const reviewComment = rev.comment || rev.review || "Wonderful stay!";
+                  const reviewCategories = Array.isArray(rev.categories) && rev.categories.length > 0 ? rev.categories : ["Verified Stay"];
+                  const reviewImages = Array.isArray(rev.images) ? rev.images : rev.image ? [rev.image] : [];
+
+                  return (
+                    <View key={idx} style={[styles.reviewCard, { marginBottom: 16 }]}>
+                      <View style={styles.reviewerHeader}>
+                        <View style={styles.orangeAvatarCircle}>
+                          <Text style={styles.orangeAvatarLetter}>{initial}</Text>
+                        </View>
+                        <View style={styles.reviewerMeta}>
+                          <Text style={styles.reviewerNameText}>{authorName}</Text>
+                          <Text style={styles.reviewTimeText}>{reviewDate}</Text>
+                          <View style={styles.ratingScorePillRow}>
+                            <Ionicons name="star" size={13} color="#F59E0B" style={{ marginRight: 3 }} />
+                            <Text style={styles.reviewScoreVal}>{reviewRating} /5</Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                        {reviewCategories.map((c: string, cIdx: number) => (
+                          <View key={cIdx} style={styles.reviewTagBadge}>
+                            <Ionicons name="checkmark" size={11} color="#059669" style={{ marginRight: 3 }} />
+                            <Text style={styles.reviewTagBadgeText}>{c}</Text>
+                          </View>
+                        ))}
+                      </View>
+
+                      <Text style={styles.reviewBodyText}>{reviewComment}</Text>
+
+                      {reviewImages.length > 0 && (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+                          {reviewImages.map((imgUrl: string, imgIdx: number) => (
+                            <TouchableOpacity
+                              key={imgIdx}
+                              style={styles.reviewAttachmentThumb}
+                              activeOpacity={0.85}
+                              onPress={() => setPreviewImage(imgUrl)}
+                            >
+                              <Image
+                                source={{ uri: imgUrl }}
+                                style={styles.reviewAttachmentImg}
+                                contentFit="cover"
+                              />
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      )}
                     </View>
-                  </View>
-                </View>
-
-                <View style={styles.reviewTagBadge}>
-                  <Ionicons name="checkmark" size={11} color="#059669" style={{ marginRight: 3 }} />
-                  <Text style={styles.reviewTagBadgeText}>Amenities</Text>
-                </View>
-
-                <Text style={styles.reviewBodyText}>
-                  Exceptional property! The swimming pool and mountain views were unbelievable. The in-house caretaker was extremely helpful.
-                </Text>
-
-                <View style={styles.reviewAttachmentThumb}>
-                  <Image
-                    source={{
-                      uri: "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=400&q=80",
-                    }}
-                    style={styles.reviewAttachmentImg}
-                    contentFit="cover"
-                  />
-                </View>
-              </View>
+                  );
+                })
+              )}
             </ScrollView>
           </View>
         </View>
@@ -1299,17 +1510,42 @@ export default function PropertyDetailScreen() {
                 <Ionicons name="close" size={22} color="#374151" />
               </TouchableOpacity>
             </View>
-            <View style={styles.modalContent}>
-              <Text style={styles.faqQ}>Q: What is the check-in and check-out time?</Text>
-              <Text style={styles.faqA}>A: Check-in is at 1:00 PM and check-out is at 11:00 AM.</Text>
-
-              <Text style={styles.faqQ}>Q: Is self-cooking allowed in the kitchen?</Text>
-              <Text style={styles.faqA}>A: Yes, kitchen access is available with basic cookware and induction.</Text>
-
-              <Text style={styles.faqQ}>Q: Are pets allowed?</Text>
-              <Text style={styles.faqA}>A: Yes, friendly pets are warmly welcomed on the property.</Text>
-            </View>
+            <ScrollView style={styles.modalContent}>
+              {(Array.isArray(property.faqs) && property.faqs.length > 0
+                ? property.faqs
+                : [
+                    { question: "What is the check-in and check-out time?", answer: `Check-in is at ${property.checkInTime || "1:00 PM"} and check-out is at ${property.checkOutTime || "11:00 AM"}.` },
+                    { question: "Is self-cooking allowed in the kitchen?", answer: "Yes, kitchen access is available with basic cookware and induction." },
+                    { question: "Are pets allowed?", answer: "Yes, friendly pets are warmly welcomed on the property." },
+                    { question: "What is the security deposit?", answer: `A refundable security deposit of ₹${(property.securityDeposit || 5000).toLocaleString("en-IN")} is required at check-in.` },
+                  ]
+              ).map((faq: any, fIdx: number) => (
+                <View key={fIdx} style={{ marginBottom: 14 }}>
+                  <Text style={styles.faqQ}>Q: {faq.question || faq.q}</Text>
+                  <Text style={styles.faqA}>A: {faq.answer || faq.ans || faq.a}</Text>
+                </View>
+              ))}
+            </ScrollView>
           </View>
+        </View>
+      </Modal>
+
+      {/* Full-Screen Image Preview Modal */}
+      <Modal visible={!!previewImage} transparent animationType="fade">
+        <View style={styles.fullImageModalBackdrop}>
+          <TouchableOpacity
+            style={styles.fullImageCloseBtn}
+            onPress={() => setPreviewImage(null)}
+          >
+            <Ionicons name="close" size={28} color="#FFFFFF" />
+          </TouchableOpacity>
+          {previewImage && (
+            <Image
+              source={{ uri: previewImage }}
+              style={styles.fullImagePreview}
+              contentFit="contain"
+            />
+          )}
         </View>
       </Modal>
 
@@ -2793,5 +3029,40 @@ const styles = StyleSheet.create({
     color: "#4B5563",
     marginTop: 2,
     marginBottom: 4,
+  },
+  reviewerNameText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  showAllReviewsBtn: {
+    backgroundColor: "#F3F4F6",
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 12,
+  },
+  showAllReviewsText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#374151",
+  },
+  fullImageModalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.92)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fullImageCloseBtn: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    zIndex: 100,
+    padding: 8,
+  },
+  fullImagePreview: {
+    width: "92%",
+    height: "80%",
   },
 });

@@ -40,14 +40,13 @@ export interface PropertyItem {
     state?: string;
     addressLine?: string;
     locationName?: string;
+    area?: string;
+    pincode?: string;
     coordinates?: [number, number];
   };
-  coordinates?: {
-    lat?: number;
-    lng?: number;
-  };
+  coordinates?: [number, number] | { lat?: number; lng?: number };
   city?: string;
-  location?: string;
+  location?: any;
   rating?: number;
   reviewCount?: number;
   reviewsCount?: number;
@@ -63,8 +62,15 @@ export interface PropertyItem {
     maxGuests?: number;
   };
   amenities?: string[];
+  topamenities?: string[];
   facilities?: string[];
   rules?: string[];
+  houseRules?: string[];
+  cancellationPolicy?: string[];
+  paymentTerms?: string[];
+  kitchenPolicy?: string[];
+  securityDeposit?: number;
+  lateCheckoutCharge?: number;
   checkInTime?: string;
   checkOutTime?: string;
   featured?: boolean;
@@ -77,11 +83,80 @@ export interface PropertyItem {
   averageRating?: number;
   totalReviews?: number;
   greatFor?: string[];
-  topamenities?: string[];
   reelVideo?: string;
   owner?: any;
   isSuperhost?: boolean;
   badge?: string;
+  brochure?: string;
+  reviews?: Array<{
+    _id?: string;
+    userId?: {
+      _id?: string;
+      fullName?: string;
+      email?: string;
+    };
+    bookingId?: any;
+    name?: string;
+    rating?: number;
+    comment?: string;
+    images?: string[];
+    isTopReview?: boolean;
+    categories?: string[];
+    createdAt?: string;
+  }>;
+  spaces?: Array<{
+    _id?: string;
+    name: string;
+    description?: string;
+    image?: string;
+    details?: string[];
+  }>;
+  foodOptions?: {
+    available?: string[];
+    default?: string[];
+    adultPrice?: number;
+    childPrice?: number;
+    note?: string;
+  };
+  nearbyattractions?: Array<{
+    nearbylocation?: string;
+    distance?: string;
+  }>;
+  highlights?: Array<{
+    _id?: string;
+    title: string;
+    description?: string;
+    image?: string;
+  }>;
+  experiences?: Array<{
+    _id?: string;
+    title: string;
+    description?: string;
+    image?: string;
+    category?: string;
+    order?: number;
+  }>;
+  faqs?: Array<{
+    _id?: string;
+    question: string;
+    answer: string;
+  }>;
+  events?: Array<{
+    _id?: string;
+    title: string;
+    description?: string;
+    bannerImage?: string;
+    eventType?: string;
+    startDate?: string;
+    endDate?: string;
+    pricePerPerson?: number;
+    isIncludedInStay?: boolean;
+    discountText?: string;
+    offerCoupon?: string;
+    maxAttendees?: number;
+    currentAttendees?: number;
+    isActive?: boolean;
+  }>;
 }
 
 export interface DestinationItem {
@@ -155,10 +230,32 @@ export async function fetchWeekendProperties(categoryId?: string) {
 }
 
 export async function fetchPropertyById(propertyId: string, categoryId?: string) {
-  const cat = categoryId || CATEGORY_IDS.VILLA;
-  const res = await api.get(`/User/property/${cat}/${propertyId}`);
-  if (res?.success && res.data) return res;
-  return api.get(`/User/properties/${propertyId}`);
+  // 1. Prioritize category-specific routes that return complete villa models (reviews, spaces, etc.)
+  let primaryPath = `/Villa/get/villa/${propertyId}`;
+  if (categoryId === CATEGORY_IDS.CAMPING) primaryPath = `/Camping/get/camping/${propertyId}`;
+  else if (categoryId === CATEGORY_IDS.COTTAGE) primaryPath = `/Cottage/get/cottage/${propertyId}`;
+  else if (categoryId === CATEGORY_IDS.HOTEL) primaryPath = `/Hotel/get/hotel/${propertyId}`;
+
+  try {
+    const res = await api.get(primaryPath);
+    if (res?.success && res.data) return res;
+  } catch {}
+
+  // 2. If specific category failed or wasn't provided, try /Villa/get/villa
+  if (primaryPath !== `/Villa/get/villa/${propertyId}`) {
+    try {
+      const resVilla = await api.get(`/Villa/get/villa/${propertyId}`);
+      if (resVilla?.success && resVilla.data) return resVilla;
+    } catch {}
+  }
+
+  // 3. Fallback to /User/properties/:id
+  try {
+    const resUser = await api.get(`/User/properties/${propertyId}`);
+    if (resUser?.success && resUser.data) return resUser;
+  } catch {}
+
+  return api.get(`/User/property/${categoryId || CATEGORY_IDS.VILLA}/${propertyId}`);
 }
 
 export async function fetchDestinations(): Promise<{ success: boolean; data: DestinationItem[] }> {
