@@ -86,6 +86,19 @@ export default function SearchYourGatewayScreen() {
     };
   }, [selectedLocId, selectedCategory]);
 
+  const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const selectedLocationObj = locations.find((l) => l._id === selectedLocId);
+  const activeLocationName =
+    selectedLocationObj?.name || (selectedLocId !== "loc-all" ? params.locationName : "") || "Lonavala, Maharashtra";
+
+  const dynamicMapUri = useMemo(() => {
+    if (googleMapsApiKey && googleMapsApiKey.trim().length > 0) {
+      const locQuery = encodeURIComponent(activeLocationName);
+      return `https://maps.googleapis.com/maps/api/staticmap?center=${locQuery}&zoom=12&size=800x600&scale=2&maptype=roadmap&key=${googleMapsApiKey.trim()}`;
+    }
+    return null;
+  }, [googleMapsApiKey, activeLocationName]);
+
   const handleLocationPress = async (locId: string) => {
     try {
       await Haptics.selectionAsync();
@@ -200,7 +213,11 @@ export default function SearchYourGatewayScreen() {
       <View style={styles.mapCanvas}>
         {/* Styled Map Background Representation */}
         <Image
-          source={require("../../assets/brand/google-maps.jpg")}
+          source={
+            dynamicMapUri
+              ? { uri: dynamicMapUri }
+              : require("../../assets/brand/google-maps.jpg")
+          }
           style={styles.mapBg}
           resizeMode="cover"
         />

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Share,
   Platform,
   Modal,
+  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
@@ -78,39 +79,39 @@ const SAMPLE_SPACES = [
   {
     name: "Private Pool & Deck",
     category: "Pool & Deck",
-    description: "Private swimming pool with sun loungers and music setup",
+    description: "Private swimming pool with sun deck and evening party lighting",
     image: "https://images.unsplash.com/photo-1576013551627-0cc20b96c2a7?w=800&q=80",
-    features: ["Private Swimming Pool", "Sun Deck", "Evening Lighting"],
+    features: ["Private Swimming Pool", "Sun Loungers", "Poolside Barbecue"],
   },
   {
-    name: "Master Suite",
+    name: "Master Bedroom",
     category: "Bedrooms & Suites",
-    description: "Spacious AC bedroom with king size bed and ensuite bathroom",
+    description: "AC bedroom with king size bed and attached ensuite bathroom",
     image: "https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800&q=80",
     features: ["Air Conditioned", "Attached Ensuite Bath", "Plush Linens"],
   },
 ];
 
-const SAMPLE_REVIEWS = [
-  {
-    id: "r1",
-    name: "Aman Sharma",
-    avatar: "A",
-    rating: 5,
-    date: "2 weeks ago",
-    comment:
-      "Exceptional property! The swimming pool and mountain views were unbelievable. The in-house caretaker was extremely helpful and made sure our family stay was seamless.",
-  },
-  {
-    id: "r2",
-    name: "Pooja Mehta",
-    avatar: "P",
-    rating: 5,
-    date: "1 month ago",
-    comment:
-      "Perfect weekend gateway for our group of 8. The barbecue night and sound system were great. Very clean and spacious rooms.",
-  },
+const ALL_AMENITIES_LIST = [
+  { icon: "wifi", label: "WiFi" },
+  { icon: "snow-outline", label: "Heating" },
+  { icon: "air-conditioner", label: "Air Conditioning", isMdi: true },
+  { icon: "battery-charging-outline", label: "Power Backup" },
+  { icon: "water-outline", label: "Water Supply" },
+  { icon: "shield-checkmark-outline", label: "Security" },
+  { icon: "videocam-outline", label: "CCTV" },
+  { icon: "car-outline", label: "Parking" },
+  { icon: "pool", label: "Swimming Pool", isMdi: true },
+  { icon: "volume-high-outline", label: "Sound System" },
+  { icon: "flower", label: "Garden", isMdi: true },
+  { icon: "tv-outline", label: "Smart TV" },
+  { icon: "restaurant-outline", label: "In-House Chef" },
+  { icon: "flame-outline", label: "Bonfire & BBQ" },
+  { icon: "cafe-outline", label: "Coffee Maker" },
+  { icon: "bed-outline", label: "Extra Mattresses" },
 ];
+
+const REVIEW_FILTER_TAGS = ["All", "Amenities", "Stay", "Food", "Service", "View"];
 
 export default function PropertyDetailScreen() {
   const router = useRouter();
@@ -124,6 +125,17 @@ export default function PropertyDetailScreen() {
   const [activeTab, setActiveTab] = useState("highlights");
   const [isReadMore, setIsReadMore] = useState(false);
   const [spaceCurrentIndex, setSpaceCurrentIndex] = useState(0);
+
+  // Reviews state
+  const [reviewFilter, setReviewFilter] = useState("All");
+  const [reviewSort, setReviewSort] = useState("Most Popular");
+  const [isAllReviewsModalOpen, setIsAllReviewsModalOpen] = useState(false);
+
+  // Amenities state
+  const [showAllAmenities, setShowAllAmenities] = useState(false);
+
+  // Location Map state
+  const [mapType, setMapType] = useState<"map" | "satellite">("map");
 
   // Modals
   const [isBrochureOpen, setIsBrochureOpen] = useState(false);
@@ -180,6 +192,19 @@ export default function PropertyDetailScreen() {
     }
   };
 
+  const handleOpenMapExternal = () => {
+    const query = encodeURIComponent(`${property?.name || "Villa"}, Malavli, Lonavala`);
+    const url = Platform.select({
+      ios: `maps:0,0?q=${query}`,
+      android: `geo:0,0?q=${query}`,
+    });
+    if (url) {
+      Linking.openURL(url).catch(() => {
+        Linking.openURL(`https://maps.google.com/?q=${query}`);
+      });
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -222,6 +247,18 @@ export default function PropertyDetailScreen() {
 
   const cityName = property.address?.city || property.city || "Lonavala";
   const addressLine = property.address?.addressLine || "Malavli";
+  const fullAddress = `${addressLine}, Boraj Road, Near Gharkul Society, ${cityName}`;
+  const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+  const dynamicMapUri = useMemo(() => {
+    if (googleMapsApiKey && googleMapsApiKey.trim().length > 0) {
+      const locQuery = encodeURIComponent(fullAddress || `${property?.name || "Villa"}, ${cityName}`);
+      const mapTypeParam = mapType === "satellite" ? "satellite" : "roadmap";
+      return `https://maps.googleapis.com/maps/api/staticmap?center=${locQuery}&zoom=14&size=640x360&scale=2&maptype=${mapTypeParam}&markers=color:red%7Clabel:V%7C${locQuery}&key=${googleMapsApiKey.trim()}`;
+    }
+    return null;
+  }, [googleMapsApiKey, fullAddress, property?.name, cityName, mapType]);
+
   const maxGuests = property.maxCapacity || property.maxGuests || 8;
   const roomsCount = property.rooms || property.bedrooms || 2;
   const bathsCount = property.baths != null ? property.baths : 2;
@@ -230,10 +267,12 @@ export default function PropertyDetailScreen() {
     `A serene getaway in ${addressLine}, ${cityName} with private swimming pool, garden area, and modern amenities. Ideal for families and groups, offering a peaceful nature-centric stay with homely food and dedicated concierge service.`;
   const descriptionText = property.description || defaultDescription;
 
+  const displayedAmenities = showAllAmenities ? ALL_AMENITIES_LIST : ALL_AMENITIES_LIST.slice(0, 8);
+
   return (
     <View style={styles.screenContainer}>
       {/* ========================================================================= */}
-      {/* 1. TOP HEADER (Matching VillaHeader.js)                                   */}
+      {/* 1. TOP HEADER                                                             */}
       {/* ========================================================================= */}
       <View style={[styles.topHeader, { paddingTop: Math.max(insets.top, 10) }]}>
         <View style={styles.headerLeft}>
@@ -297,7 +336,7 @@ export default function PropertyDetailScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ========================================================================= */}
-        {/* 2. HERO CAROUSEL (Matching VillaHero.js)                                  */}
+        {/* 2. HERO CAROUSEL                                                          */}
         {/* ========================================================================= */}
         <View style={styles.heroContainer}>
           <ScrollView
@@ -370,10 +409,9 @@ export default function PropertyDetailScreen() {
         </View>
 
         {/* ========================================================================= */}
-        {/* 3. DETAILS & BROCHURE SECTION (Matching VillaDetails.js)                  */}
+        {/* 3. DETAILS HEADER                                                         */}
         {/* ========================================================================= */}
         <View style={styles.detailsContainer}>
-          {/* Title & View Brochure Button */}
           <View style={styles.titleBrochureRow}>
             <View style={styles.titleTextBlock}>
               <Text style={styles.detailTitle}>
@@ -394,7 +432,6 @@ export default function PropertyDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Rating and Reviews Row */}
           <View style={styles.ratingReviewsRow}>
             <View style={styles.guestFavPill}>
               <Text style={styles.guestFavText}>Guest Favourite</Text>
@@ -407,11 +444,10 @@ export default function PropertyDetailScreen() {
             </View>
 
             <TouchableOpacity activeOpacity={0.7} onPress={() => handleTabPress("reviews")}>
-              <Text style={styles.reviewsLink}>1 Reviews</Text>
+              <Text style={styles.reviewsLink}>(1 Reviews)</Text>
             </TouchableOpacity>
           </View>
 
-          {/* 3 Key Spec Cards (Guests, Rooms, Baths) */}
           <View style={styles.specCardsRow}>
             <View style={styles.specCard}>
               <Ionicons name="people-outline" size={18} color="#FF5A1F" style={{ marginRight: 6 }} />
@@ -428,57 +464,10 @@ export default function PropertyDetailScreen() {
               <Text style={styles.specCardText}>{bathsCount} Baths</Text>
             </View>
           </View>
-
-          {/* Great For Tag */}
-          <View style={styles.greatForDetailRow}>
-            <Text style={styles.greatForDetailLabel}>Great for:</Text>
-            <View style={styles.greatForDetailPill}>
-              <Ionicons name="people" size={13} color="#059669" style={{ marginRight: 4 }} />
-              <Text style={styles.greatForDetailText}>Ideal for Families</Text>
-            </View>
-          </View>
-
-          {/* 5-Column Amenities Square Icons Row */}
-          <View style={styles.amenitiesGridDetail}>
-            <View style={styles.amenityBoxCol}>
-              <View style={styles.amenitySquare}>
-                <MaterialCommunityIcons name="air-conditioner" size={22} color="#FF5A1F" />
-              </View>
-              <Text style={styles.amenityBoxLabel} numberOfLines={1}>AC</Text>
-            </View>
-
-            <View style={styles.amenityBoxCol}>
-              <View style={styles.amenitySquare}>
-                <Ionicons name="battery-charging-outline" size={22} color="#FF5A1F" />
-              </View>
-              <Text style={styles.amenityBoxLabel} numberOfLines={1}>Power Backup</Text>
-            </View>
-
-            <View style={styles.amenityBoxCol}>
-              <View style={styles.amenitySquare}>
-                <MaterialCommunityIcons name="pool" size={22} color="#FF5A1F" />
-              </View>
-              <Text style={styles.amenityBoxLabel} numberOfLines={1}>Swimming Pool</Text>
-            </View>
-
-            <View style={styles.amenityBoxCol}>
-              <View style={styles.amenitySquare}>
-                <Ionicons name="volume-high-outline" size={22} color="#FF5A1F" />
-              </View>
-              <Text style={styles.amenityBoxLabel} numberOfLines={1}>Sound System</Text>
-            </View>
-
-            <View style={styles.amenityBoxCol}>
-              <View style={styles.amenitySquare}>
-                <MaterialCommunityIcons name="flower" size={22} color="#FF5A1F" />
-              </View>
-              <Text style={styles.amenityBoxLabel} numberOfLines={1}>Garden</Text>
-            </View>
-          </View>
         </View>
 
         {/* ========================================================================= */}
-        {/* 4. HORIZONTAL STICKY TABS                                                 */}
+        {/* 4. HORIZONTAL STICKY TABS BAR                                             */}
         {/* ========================================================================= */}
         <View style={styles.tabsBar}>
           <ScrollView
@@ -522,19 +511,17 @@ export default function PropertyDetailScreen() {
         </View>
 
         {/* ========================================================================= */}
-        {/* 5. HIGHLIGHTS & VILLACAMP EXPERIENCE (Screenshot 1 & 2)                  */}
+        {/* 5. HIGHLIGHTS & VILLACAMP EXPERIENCE                                      */}
         {/* ========================================================================= */}
         <View
           onLayout={(e) => (sectionYPositions.current["highlights"] = e.nativeEvent.layout.y)}
           style={styles.sectionContainer}
         >
-          {/* Experience Title */}
           <View style={styles.sectionHeaderRow}>
             <View style={styles.orangeBar} />
             <Text style={styles.sectionHeading}>The Villacamp Experience</Text>
           </View>
 
-          {/* Signature Experience Horizontal Cards */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -558,7 +545,6 @@ export default function PropertyDetailScreen() {
             ))}
           </ScrollView>
 
-          {/* Special Villa Highlights */}
           <View style={styles.subSectionHeader}>
             <Ionicons name="sparkles" size={16} color="#FF5A1F" style={{ marginRight: 6 }} />
             <Text style={styles.subSectionTitle}>Special Villa Highlights</Text>
@@ -580,7 +566,6 @@ export default function PropertyDetailScreen() {
             ))}
           </View>
 
-          {/* Property Description Block */}
           <View style={[styles.sectionHeaderRow, { marginTop: 18 }]}>
             <View style={styles.orangeBar} />
             <Text style={styles.sectionHeading}>{property.name || "Vastalya Villa"}</Text>
@@ -598,7 +583,6 @@ export default function PropertyDetailScreen() {
             <Text style={styles.readMoreText}>{isReadMore ? "Read Less" : "Read More"}</Text>
           </TouchableOpacity>
 
-          {/* Great For Tag Chips */}
           <View style={styles.tagChipsRow}>
             <View style={styles.orangeTagChip}>
               <Text style={styles.orangeTagText}>✦ Ideal for Families</Text>
@@ -611,7 +595,6 @@ export default function PropertyDetailScreen() {
             </View>
           </View>
 
-          {/* Action Buttons: View Brochure & FAQ's */}
           <View style={styles.actionButtonsRow}>
             <TouchableOpacity
               style={styles.orangeActionButton}
@@ -632,7 +615,7 @@ export default function PropertyDetailScreen() {
         </View>
 
         {/* ========================================================================= */}
-        {/* 6. PROPERTY EVENTS (Screenshot 2 & 3)                                    */}
+        {/* 6. PROPERTY EVENTS                                                        */}
         {/* ========================================================================= */}
         <View
           onLayout={(e) => (sectionYPositions.current["events"] = e.nativeEvent.layout.y)}
@@ -648,7 +631,6 @@ export default function PropertyDetailScreen() {
             </View>
           </View>
 
-          {/* Event Card */}
           <View style={styles.eventCard}>
             <View style={styles.eventBannerContainer}>
               <Image
@@ -662,12 +644,10 @@ export default function PropertyDetailScreen() {
                 colors={["transparent", "rgba(0,0,0,0.88)"]}
                 style={styles.eventGradient}
               >
-                {/* Top Badge */}
                 <View style={styles.eventTopBadge}>
                   <Text style={styles.eventTopBadgeText}>🎉 bbq_night</Text>
                 </View>
 
-                {/* Bottom Title on Image */}
                 <Text style={styles.eventTitleOnImage}>
                   Sunset Sundowner & Live Barbecue
                 </Text>
@@ -696,7 +676,7 @@ export default function PropertyDetailScreen() {
         </View>
 
         {/* ========================================================================= */}
-        {/* 7. RULES AND REFUND POLICY (Screenshot 3 & 4)                            */}
+        {/* 7. RULES AND REFUND POLICY                                                */}
         {/* ========================================================================= */}
         <View
           onLayout={(e) => (sectionYPositions.current["refund"] = e.nativeEvent.layout.y)}
@@ -707,7 +687,6 @@ export default function PropertyDetailScreen() {
             <Text style={styles.sectionHeading}>Rules and Refund Policy</Text>
           </View>
 
-          {/* 4-Card 2x2 Grid */}
           <View style={styles.policyGrid}>
             <View style={styles.policyGridCard}>
               <Text style={styles.policyCardLabel}>🕒 CHECK-IN</Text>
@@ -732,7 +711,6 @@ export default function PropertyDetailScreen() {
             </View>
           </View>
 
-          {/* Cancellation Policy Card */}
           <View style={styles.ruleCard}>
             <Text style={styles.ruleCardHeader}>• Cancellation Policy</Text>
             <View style={styles.ruleBullet}>
@@ -749,7 +727,6 @@ export default function PropertyDetailScreen() {
             </View>
           </View>
 
-          {/* House Rules Card */}
           <View style={styles.ruleCard}>
             <Text style={styles.ruleCardHeader}>• House Rules</Text>
             <View style={styles.ruleBullet}>
@@ -768,7 +745,7 @@ export default function PropertyDetailScreen() {
         </View>
 
         {/* ========================================================================= */}
-        {/* 8. SPACES & LIVING AREAS (Screenshot 5)                                   */}
+        {/* 8. SPACES & LIVING AREAS                                                  */}
         {/* ========================================================================= */}
         <View
           onLayout={(e) => (sectionYPositions.current["spaces"] = e.nativeEvent.layout.y)}
@@ -802,13 +779,11 @@ export default function PropertyDetailScreen() {
                     style={styles.spaceImage}
                     contentFit="cover"
                   />
-                  {/* Category Badge */}
                   <View style={styles.spaceCategoryBadge}>
                     <Ionicons name="home-outline" size={11} color="#FF5A1F" style={{ marginRight: 4 }} />
                     <Text style={styles.spaceCategoryText}>{space.category}</Text>
                   </View>
 
-                  {/* View Photo Badge */}
                   <View style={styles.viewPhotoBadge}>
                     <Text style={styles.viewPhotoText}>View Photo</Text>
                   </View>
@@ -832,57 +807,377 @@ export default function PropertyDetailScreen() {
         </View>
 
         {/* ========================================================================= */}
-        {/* 9. GUEST REVIEWS (Screenshot 5)                                          */}
+        {/* 9. GUEST REVIEWS (Screenshots 1 & 2)                                      */}
         {/* ========================================================================= */}
         <View
           onLayout={(e) => (sectionYPositions.current["reviews"] = e.nativeEvent.layout.y)}
           style={styles.sectionContainer}
         >
-          <View style={styles.sectionHeaderRow}>
-            <View style={styles.orangeBar} />
-            <Text style={styles.sectionHeading}>Guest Reviews</Text>
-          </View>
-
           {/* 5 Big Gold Stars Summary */}
           <View style={styles.reviewsSummaryCenter}>
             <View style={styles.starsRow}>
               {[1, 2, 3, 4, 5].map((s) => (
-                <Ionicons key={s} name="star" size={26} color="#FBBF24" style={{ marginHorizontal: 2 }} />
+                <Ionicons key={s} name="star" size={28} color="#FBBF24" style={{ marginHorizontal: 2 }} />
               ))}
             </View>
             <Text style={styles.bigScoreText}>5/5</Text>
-            <View style={styles.reviewPill}>
-              <Text style={styles.reviewPillText}>Guest Favourite</Text>
+            <View style={styles.guestFavReviewsRow}>
+              <Text style={styles.guestFavBoldText}>Guest Favourite</Text>
+              <TouchableOpacity onPress={() => setIsAllReviewsModalOpen(true)}>
+                <Text style={styles.reviewCountLink}> (1 Reviews)</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
-          {/* Review Cards */}
-          <View style={styles.reviewsList}>
-            {SAMPLE_REVIEWS.map((rev) => (
-              <View key={rev.id} style={styles.reviewCard}>
-                <View style={styles.reviewerHeader}>
-                  <View style={styles.reviewerAvatar}>
-                    <Text style={styles.reviewerAvatarText}>{rev.avatar}</Text>
-                  </View>
-                  <View style={styles.reviewerInfo}>
-                    <Text style={styles.reviewerName}>{rev.name}</Text>
-                    <Text style={styles.reviewerDate}>{rev.date}</Text>
-                  </View>
-                  <View style={styles.reviewRatingStars}>
-                    {[...Array(rev.rating)].map((_, i) => (
-                      <Ionicons key={i} name="star" size={13} color="#FBBF24" />
-                    ))}
-                  </View>
+          {/* Category Filter Pills Row (Screenshot 1) */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterPillsScroll}
+          >
+            {REVIEW_FILTER_TAGS.map((tag) => {
+              const isSelected = reviewFilter === tag;
+              return (
+                <TouchableOpacity
+                  key={tag}
+                  style={[styles.filterPill, isSelected && styles.filterPillSelected]}
+                  onPress={() => setReviewFilter(tag)}
+                  activeOpacity={0.75}
+                >
+                  {isSelected && (
+                    <Ionicons name="checkmark" size={13} color="#059669" style={{ marginRight: 3 }} />
+                  )}
+                  <Text style={[styles.filterPillText, isSelected && styles.filterPillTextSelected]}>
+                    {tag}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {/* Sort By Row */}
+          <View style={styles.sortByRow}>
+            <Text style={styles.sortByLabel}>Sort by:</Text>
+            <TouchableOpacity
+              style={[styles.sortPill, reviewSort === "Most Popular" && styles.sortPillSelected]}
+              onPress={() => setReviewSort("Most Popular")}
+              activeOpacity={0.75}
+            >
+              {reviewSort === "Most Popular" && (
+                <Ionicons name="checkmark" size={13} color="#059669" style={{ marginRight: 3 }} />
+              )}
+              <Text style={[styles.sortPillText, reviewSort === "Most Popular" && styles.sortPillTextSelected]}>
+                Most Popular
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.sortPill, reviewSort === "Most Recent" && styles.sortPillSelected]}
+              onPress={() => setReviewSort("Most Recent")}
+              activeOpacity={0.75}
+            >
+              {reviewSort === "Most Recent" && (
+                <Ionicons name="checkmark" size={13} color="#059669" style={{ marginRight: 3 }} />
+              )}
+              <Text style={[styles.sortPillText, reviewSort === "Most Recent" && styles.sortPillTextSelected]}>
+                Most Recent
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Review Card (Matching Screenshot 1) */}
+          <View style={styles.reviewCard}>
+            <View style={styles.reviewerHeader}>
+              <View style={styles.orangeAvatarCircle}>
+                <Text style={styles.orangeAvatarLetter}>S</Text>
+              </View>
+              <View style={styles.reviewerMeta}>
+                <Text style={styles.reviewTimeText}>9 months ago</Text>
+                <View style={styles.ratingScorePillRow}>
+                  <Ionicons name="star" size={13} color="#F59E0B" style={{ marginRight: 3 }} />
+                  <Text style={styles.reviewScoreVal}>5 /5</Text>
                 </View>
-                <Text style={styles.reviewComment}>{rev.comment}</Text>
+              </View>
+            </View>
+
+            <View style={styles.reviewTagBadge}>
+              <Ionicons name="checkmark" size={11} color="#059669" style={{ marginRight: 3 }} />
+              <Text style={styles.reviewTagBadgeText}>Amenities</Text>
+            </View>
+
+            <Text style={styles.reviewBodyText}>
+              Exceptional property! The swimming pool and mountain views were unbelievable. The in-house caretaker was extremely helpful.
+            </Text>
+
+            {/* Attached Photo Thumbnail */}
+            <View style={styles.reviewAttachmentThumb}>
+              <Image
+                source={{
+                  uri: "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=400&q=80",
+                }}
+                style={styles.reviewAttachmentImg}
+                contentFit="cover"
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* ========================================================================= */}
+        {/* 10. VILLA AMENITIES (Screenshot 3)                                        */}
+        {/* ========================================================================= */}
+        <View
+          onLayout={(e) => (sectionYPositions.current["amenities"] = e.nativeEvent.layout.y)}
+          style={styles.sectionContainer}
+        >
+          <View style={styles.sectionHeaderWithBadge}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.orangeBar} />
+              <Text style={styles.sectionHeading}>Villa Amenities</Text>
+            </View>
+            <Text style={styles.totalAmenitiesBadge}>32 Total</Text>
+          </View>
+
+          {/* Top Amenities Box (Screenshot 3) */}
+          <View style={styles.topAmenitiesBanner}>
+            <View style={styles.topAmenitiesHeaderRow}>
+              <Ionicons name="sparkles" size={14} color="#EA580C" style={{ marginRight: 4 }} />
+              <Text style={styles.topAmenitiesHeading}>TOP AMENITIES:</Text>
+            </View>
+            <View style={styles.topAmenitiesPillWrap}>
+              {["AC", "Power Backup", "Swimming Pool", "Sound System", "Garden"].map((am, i) => (
+                <View key={i} style={styles.topAmenityPill}>
+                  <Text style={styles.topAmenityPillText}>✓ {am}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* 2-Column Amenity Cards Grid */}
+          <View style={styles.amenityCardsGrid}>
+            {displayedAmenities.map((item, idx) => (
+              <View key={idx} style={styles.amenityGridCard}>
+                <View style={styles.amenityCardIconBox}>
+                  {item.isMdi ? (
+                    <MaterialCommunityIcons name={item.icon as any} size={18} color="#EA580C" />
+                  ) : (
+                    <Ionicons name={item.icon as any} size={18} color="#EA580C" />
+                  )}
+                </View>
+                <Text style={styles.amenityCardLabel} numberOfLines={1}>
+                  {item.label}
+                </Text>
               </View>
             ))}
+          </View>
+
+          {/* Show All Amenities Button */}
+          <TouchableOpacity
+            style={styles.showAllAmenitiesBtn}
+            onPress={() => setShowAllAmenities(!showAllAmenities)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.showAllAmenitiesText}>
+              {showAllAmenities ? "Show fewer amenities" : "Show all 32 amenities"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ========================================================================= */}
+        {/* 11. MEALS & DINING EXPERIENCE (Screenshot 4)                              */}
+        {/* ========================================================================= */}
+        <View
+          onLayout={(e) => (sectionYPositions.current["meals"] = e.nativeEvent.layout.y)}
+          style={styles.sectionContainer}
+        >
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.orangeBar} />
+            <Text style={styles.sectionHeading}>Meals & Dining Experience</Text>
+          </View>
+
+          {/* Adult Meal Package Card */}
+          <View style={styles.mealPackageCard}>
+            <View style={styles.mealPackageHeaderRow}>
+              <View>
+                <Text style={styles.mealPackageBadge}>GOURMET SPREAD</Text>
+                <Text style={styles.mealPackageTitle}>Adult Meal Package</Text>
+              </View>
+              <View style={styles.mealPackagePriceCol}>
+                <Text style={styles.mealPackagePrice}>₹2,000</Text>
+                <Text style={styles.mealPackageUnit}>/adult/day</Text>
+              </View>
+            </View>
+            <Text style={styles.mealPackageDesc}>
+              Includes full course breakfast, regional lunch, evening high-tea & snacks, and gourmet dinner prepared by our chef.
+            </Text>
+            <View style={styles.mealFeaturesRow}>
+              <Text style={styles.mealFeatureGreen}>✓ Veg & Non-Veg</Text>
+              <Text style={styles.mealFeatureDot}>•</Text>
+              <Text style={styles.mealFeatureGreen}>✓ Jain Available</Text>
+              <Text style={styles.mealFeatureDot}>•</Text>
+              <Text style={styles.mealFeatureGreen}>✓ Unlimited</Text>
+            </View>
+          </View>
+
+          {/* Child Meal Package Card */}
+          <View style={styles.childPackageCard}>
+            <View style={styles.mealPackageHeaderRow}>
+              <View>
+                <Text style={styles.childPackageBadge}>5 - 10 YEARS</Text>
+                <Text style={styles.mealPackageTitle}>Child Meal Package</Text>
+              </View>
+              <View style={styles.freeChildPill}>
+                <Text style={styles.freeChildText}>Free for Kids Under 5</Text>
+              </View>
+            </View>
+            <Text style={styles.mealPackageDesc}>
+              Mild, kid-friendly comfort preparations, fresh rotis, warm milk, and snacks.
+            </Text>
+          </View>
+
+          {/* 4 Meal Timings Grid (2x2) */}
+          <View style={styles.timingsGrid}>
+            <View style={styles.timingCard}>
+              <Text style={styles.timingTitle}>☕ Breakfast</Text>
+              <Text style={styles.timingHours}>8:30 AM – 10:30 AM</Text>
+            </View>
+            <View style={styles.timingCard}>
+              <Text style={styles.timingTitle}>🍽️ Lunch</Text>
+              <Text style={styles.timingHours}>1:00 PM – 3:00 PM</Text>
+            </View>
+            <View style={styles.timingCard}>
+              <Text style={styles.timingTitle}>☕ High Tea</Text>
+              <Text style={styles.timingHours}>5:00 PM – 6:30 PM</Text>
+            </View>
+            <View style={styles.timingCard}>
+              <Text style={styles.timingTitle}>✨ Dinner</Text>
+              <Text style={styles.timingHours}>8:30 PM – 10:30 PM</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ========================================================================= */}
+        {/* 12. LOCATION & SURROUNDINGS (Screenshot 5)                                */}
+        {/* ========================================================================= */}
+        <View
+          onLayout={(e) => (sectionYPositions.current["location"] = e.nativeEvent.layout.y)}
+          style={styles.sectionContainer}
+        >
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.orangeBar} />
+            <Text style={styles.sectionHeading}>Location & Surroundings</Text>
+          </View>
+
+          {/* Interactive Google Map Preview Box (Screenshot 5) */}
+          <View style={styles.mapBoxContainer}>
+            <Image
+              source={
+                dynamicMapUri
+                  ? { uri: dynamicMapUri }
+                  : mapType === "map"
+                  ? require("../../../assets/brand/google-maps.jpg")
+                  : {
+                      uri: "https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80",
+                    }
+              }
+              style={styles.mapImage}
+              contentFit="cover"
+            />
+
+            {/* Top-Left Map / Satellite Switcher */}
+            <View style={styles.mapSwitcherContainer}>
+              <TouchableOpacity
+                style={[styles.mapSwitchBtn, mapType === "map" && styles.mapSwitchBtnActive]}
+                onPress={() => setMapType("map")}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.mapSwitchText, mapType === "map" && styles.mapSwitchTextActive]}>
+                  Map
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.mapSwitchBtn, mapType === "satellite" && styles.mapSwitchBtnActive]}
+                onPress={() => setMapType("satellite")}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.mapSwitchText, mapType === "satellite" && styles.mapSwitchTextActive]}>
+                  Satellite
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Center Red Map Marker */}
+            <View style={styles.centerMapMarker}>
+              <Ionicons name="location" size={38} color="#DC2626" />
+            </View>
+
+            {/* Right Controls */}
+            <View style={styles.mapControlsRight}>
+              <TouchableOpacity style={styles.mapCircleIcon} onPress={handleOpenMapExternal}>
+                <Ionicons name="scan-outline" size={17} color="#374151" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.mapCircleIcon} onPress={handleOpenMapExternal}>
+                <Ionicons name="locate-outline" size={17} color="#374151" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Bottom Google attribution */}
+            <View style={styles.mapBottomAttribution}>
+              <Text style={styles.mapGoogleLogo}>Google</Text>
+              <Text style={styles.mapTermsText}>Map data ©2026 • Terms</Text>
+            </View>
+          </View>
+
+          {/* Full Property Address Card */}
+          <View style={styles.addressInfoCard}>
+            <View style={styles.addressHeaderRow}>
+              <Ionicons name="location-sharp" size={16} color="#FF5A1F" style={{ marginRight: 6 }} />
+              <Text style={styles.addressHeaderTitle}>Full Property Address</Text>
+            </View>
+            <Text style={styles.fullAddressText}>{fullAddress}</Text>
+          </View>
+
+          {/* Nearby Sightseeing Distances */}
+          <View style={styles.sightseeingCard}>
+            <View style={styles.sightseeingHeaderRow}>
+              <Ionicons name="compass-outline" size={16} color="#FF5A1F" style={{ marginRight: 6 }} />
+              <Text style={styles.sightseeingHeaderTitle}>Nearby Sightseeing Distances</Text>
+            </View>
+
+            <View style={styles.sightseeingList}>
+              <View style={styles.sightseeingItem}>
+                <Text style={styles.sightseeingItemName}>• Bhaje Caves</Text>
+                <View style={styles.distanceBadge}>
+                  <Text style={styles.distanceBadgeText}>6 km</Text>
+                </View>
+              </View>
+
+              <View style={styles.sightseeingItem}>
+                <Text style={styles.sightseeingItemName}>• Karla caves</Text>
+                <View style={styles.distanceBadge}>
+                  <Text style={styles.distanceBadgeText}>3 km</Text>
+                </View>
+              </View>
+
+              <View style={styles.sightseeingItem}>
+                <Text style={styles.sightseeingItemName}>• Pawna Lake</Text>
+                <View style={styles.distanceBadge}>
+                  <Text style={styles.distanceBadgeText}>14 km</Text>
+                </View>
+              </View>
+
+              <View style={styles.sightseeingItem}>
+                <Text style={styles.sightseeingItemName}>• Lohagad Fort</Text>
+                <View style={styles.distanceBadge}>
+                  <Text style={styles.distanceBadgeText}>10 km</Text>
+                </View>
+              </View>
+            </View>
           </View>
         </View>
       </ScrollView>
 
       {/* ========================================================================= */}
-      {/* 10. FIXED BOTTOM BOOKING BAR                                              */}
+      {/* 13. FIXED BOTTOM BOOKING BAR                                              */}
       {/* ========================================================================= */}
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <View style={styles.bottomLeft}>
@@ -915,8 +1210,57 @@ export default function PropertyDetailScreen() {
       </View>
 
       {/* ========================================================================= */}
-      {/* MODALS: Brochure, FAQs, Event Inclusions                                 */}
+      {/* MODALS: All Reviews Drawer (Screenshot 2), Brochure, FAQs, Event           */}
       {/* ========================================================================= */}
+      <Modal visible={isAllReviewsModalOpen} transparent animationType="slide">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.allReviewsModalCard}>
+            <View style={styles.allReviewsHeader}>
+              <Text style={styles.allReviewsTitle}>All Reviews (1)</Text>
+              <TouchableOpacity onPress={() => setIsAllReviewsModalOpen(false)}>
+                <Ionicons name="close" size={22} color="#111827" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ padding: 16 }}>
+              <View style={styles.reviewCard}>
+                <View style={styles.reviewerHeader}>
+                  <View style={styles.orangeAvatarCircle}>
+                    <Text style={styles.orangeAvatarLetter}>S</Text>
+                  </View>
+                  <View style={styles.reviewerMeta}>
+                    <Text style={styles.reviewTimeText}>9 months ago</Text>
+                    <View style={styles.ratingScorePillRow}>
+                      <Ionicons name="star" size={13} color="#F59E0B" style={{ marginRight: 3 }} />
+                      <Text style={styles.reviewScoreVal}>5 /5</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.reviewTagBadge}>
+                  <Ionicons name="checkmark" size={11} color="#059669" style={{ marginRight: 3 }} />
+                  <Text style={styles.reviewTagBadgeText}>Amenities</Text>
+                </View>
+
+                <Text style={styles.reviewBodyText}>
+                  Exceptional property! The swimming pool and mountain views were unbelievable. The in-house caretaker was extremely helpful.
+                </Text>
+
+                <View style={styles.reviewAttachmentThumb}>
+                  <Image
+                    source={{
+                      uri: "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=400&q=80",
+                    }}
+                    style={styles.reviewAttachmentImg}
+                    contentFit="cover"
+                  />
+                </View>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       <Modal visible={isBrochureOpen} transparent animationType="slide">
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
@@ -1295,73 +1639,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     color: "#374151",
-  },
-  greatForDetailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 14,
-  },
-  greatForDetailLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#6B7280",
-  },
-  greatForDetailPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#ECFDF5",
-    borderWidth: 0.5,
-    borderColor: "#A7F3D0",
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 14,
-  },
-  greatForDetailText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#065F46",
-  },
-  amenitiesGridDetail: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingTop: 8,
-    paddingBottom: 14,
-    borderTopWidth: 1,
-    borderTopColor: "#F3F4F6",
-  },
-  amenityBoxCol: {
-    alignItems: "center",
-    flex: 1,
-  },
-  amenitySquare: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 4,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 3,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
-  },
-  amenityBoxLabel: {
-    fontSize: 9,
-    fontWeight: "600",
-    color: "#4B5563",
-    textAlign: "center",
   },
   tabsBar: {
     borderTopWidth: 1,
@@ -1823,10 +2100,12 @@ const styles = StyleSheet.create({
     color: "#374151",
     fontWeight: "600",
   },
+
+  /* Reviews Styles (Screenshots 1 & 2) */
   reviewsSummaryCenter: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
   starsRow: {
     flexDirection: "row",
@@ -1836,28 +2115,89 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "900",
     color: "#111827",
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  reviewPill: {
-    backgroundColor: "#FFF7ED",
-    borderWidth: 1,
-    borderColor: "#FED7AA",
-    paddingHorizontal: 12,
+  guestFavReviewsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  guestFavBoldText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  reviewCountLink: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#2563EB",
+    textDecorationLine: "underline",
+  },
+  filterPillsScroll: {
+    gap: 8,
     paddingVertical: 4,
-    borderRadius: 16,
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  reviewPillText: {
-    color: "#C2410C",
-    fontSize: 11,
+  filterPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
+  },
+  filterPillSelected: {
+    borderColor: "#10B981",
+    backgroundColor: "#ECFDF5",
+  },
+  filterPillText: {
+    fontSize: 12,
+    color: "#4B5563",
+    fontWeight: "600",
+  },
+  filterPillTextSelected: {
+    color: "#059669",
     fontWeight: "700",
   },
-  reviewsList: {
-    gap: 10,
+  sortByRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  sortByLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  sortPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
+  },
+  sortPillSelected: {
+    borderColor: "#10B981",
+    backgroundColor: "#ECFDF5",
+  },
+  sortPillText: {
+    fontSize: 11,
+    color: "#4B5563",
+    fontWeight: "600",
+  },
+  sortPillTextSelected: {
+    color: "#059669",
+    fontWeight: "700",
   },
   reviewCard: {
-    backgroundColor: "#F9FAFB",
-    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     padding: 12,
@@ -1867,40 +2207,432 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
   },
-  reviewerAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  orangeAvatarCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: "#FF5A1F",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 8,
+    marginRight: 10,
   },
-  reviewerAvatarText: {
+  orangeAvatarLetter: {
     color: "#FFFFFF",
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "800",
   },
-  reviewerInfo: {
+  reviewerMeta: {
     flex: 1,
   },
-  reviewerName: {
+  reviewTimeText: {
+    fontSize: 11,
+    color: "#6B7280",
+    marginBottom: 2,
+  },
+  ratingScorePillRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  reviewScoreVal: {
     fontSize: 12,
     fontWeight: "800",
     color: "#111827",
   },
-  reviewerDate: {
+  reviewTagBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#D1FAE5",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginBottom: 8,
+  },
+  reviewTagBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#065F46",
+  },
+  reviewBodyText: {
+    fontSize: 12,
+    color: "#111827",
+    lineHeight: 17,
+    marginBottom: 8,
+  },
+  reviewAttachmentThumb: {
+    width: 64,
+    height: 64,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    overflow: "hidden",
+  },
+  reviewAttachmentImg: {
+    width: "100%",
+    height: "100%",
+  },
+
+  /* Amenities Styles (Screenshot 3) */
+  totalAmenitiesBadge: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#FF5A1F",
+  },
+  topAmenitiesBanner: {
+    backgroundColor: "#FFF7ED",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    borderRadius: 14,
+    padding: 10,
+    marginBottom: 12,
+  },
+  topAmenitiesHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  topAmenitiesHeading: {
     fontSize: 10,
+    fontWeight: "800",
+    color: "#EA580C",
+    letterSpacing: 0.5,
+  },
+  topAmenitiesPillWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  topAmenityPill: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 14,
+  },
+  topAmenityPillText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#1F2937",
+  },
+  amenityCardsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  amenityGridCard: {
+    width: (SCREEN_WIDTH - 36) / 2,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    padding: 8,
+  },
+  amenityCardIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  amenityCardLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#1F2937",
+    flex: 1,
+  },
+  showAllAmenitiesBtn: {
+    backgroundColor: "#FFF7ED",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  showAllAmenitiesText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#EA580C",
+  },
+
+  /* Meals Styles (Screenshot 4) */
+  mealPackageCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    padding: 12,
+    marginBottom: 10,
+  },
+  childPackageCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    padding: 12,
+    marginBottom: 12,
+  },
+  mealPackageHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 6,
+  },
+  mealPackageBadge: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#EA580C",
+    letterSpacing: 0.5,
+  },
+  childPackageBadge: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#6B7280",
+    letterSpacing: 0.5,
+  },
+  freeChildPill: {
+    backgroundColor: "#D1FAE5",
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  freeChildText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#065F46",
+  },
+  mealPackageTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#111827",
+    marginTop: 1,
+  },
+  mealPackagePriceCol: {
+    alignItems: "flex-end",
+  },
+  mealPackagePrice: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#EA580C",
+  },
+  mealPackageUnit: {
+    fontSize: 10,
+    color: "#6B7280",
+  },
+  mealPackageDesc: {
+    fontSize: 11,
+    color: "#4B5563",
+    lineHeight: 16,
+    marginBottom: 6,
+  },
+  mealFeaturesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  mealFeatureGreen: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#059669",
+  },
+  mealFeatureDot: {
+    fontSize: 11,
     color: "#9CA3AF",
   },
-  reviewRatingStars: {
+  timingsGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
-  reviewComment: {
-    fontSize: 12,
+  timingCard: {
+    width: (SCREEN_WIDTH - 36) / 2,
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 10,
+    padding: 8,
+  },
+  timingTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#EA580C",
+    marginBottom: 2,
+  },
+  timingHours: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#1F2937",
+  },
+
+  /* Location Styles (Screenshot 5) */
+  mapBoxContainer: {
+    width: "100%",
+    height: 180,
+    borderRadius: 14,
+    overflow: "hidden",
+    position: "relative",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#E5E7EB",
+    marginBottom: 10,
+  },
+  mapImage: {
+    width: "100%",
+    height: "100%",
+  },
+  mapSwitcherContainer: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    flexDirection: "row",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 6,
+    borderWidth: 0.5,
+    borderColor: "#D1D5DB",
+    overflow: "hidden",
+  },
+  mapSwitchBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  mapSwitchBtnActive: {
+    backgroundColor: "#F3F4F6",
+  },
+  mapSwitchText: {
+    fontSize: 11,
+    fontWeight: "600",
     color: "#4B5563",
-    lineHeight: 17,
   },
+  mapSwitchTextActive: {
+    color: "#111827",
+    fontWeight: "800",
+  },
+  centerMapMarker: {
+    position: "absolute",
+    top: "40%",
+    left: "48%",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mapControlsRight: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    gap: 6,
+  },
+  mapCircleIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 0.5,
+    borderColor: "#D1D5DB",
+  },
+  mapBottomAttribution: {
+    position: "absolute",
+    bottom: 4,
+    left: 8,
+    right: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  mapGoogleLogo: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#4B5563",
+  },
+  mapTermsText: {
+    fontSize: 9,
+    color: "#4B5563",
+  },
+  addressInfoCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    padding: 10,
+    marginBottom: 8,
+  },
+  addressHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  addressHeaderTitle: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  fullAddressText: {
+    fontSize: 11,
+    color: "#4B5563",
+    lineHeight: 16,
+    paddingLeft: 22,
+  },
+  sightseeingCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    padding: 10,
+  },
+  sightseeingHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  sightseeingHeaderTitle: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  sightseeingList: {
+    gap: 6,
+  },
+  sightseeingItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  sightseeingItemName: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#1F2937",
+  },
+  distanceBadge: {
+    backgroundColor: "#FFF7ED",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  distanceBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#EA580C",
+  },
+
+  /* Bottom Bar */
   bottomBar: {
     position: "absolute",
     bottom: 0,
@@ -1975,10 +2707,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
   },
+
+  /* Modals */
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "flex-end",
+  },
+  allReviewsModalCard: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "85%",
+  },
+  allReviewsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  allReviewsTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#111827",
   },
   modalCard: {
     backgroundColor: "#FFFFFF",
