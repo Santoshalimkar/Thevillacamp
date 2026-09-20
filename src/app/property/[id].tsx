@@ -192,8 +192,22 @@ export default function PropertyDetailScreen() {
     }
   };
 
+  const cityName = property?.address?.city || property?.city || "Lonavala";
+  const addressLine = property?.address?.addressLine || "Malavli";
+  const fullAddress = `${addressLine}, Boraj Road, Near Gharkul Society, ${cityName}`;
+  const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+  const dynamicMapUri = useMemo(() => {
+    if (googleMapsApiKey && googleMapsApiKey.trim().length > 0) {
+      const locQuery = encodeURIComponent(fullAddress || `${property?.name || "Villa"}, ${cityName}`);
+      const mapTypeParam = mapType === "satellite" ? "satellite" : "roadmap";
+      return `https://maps.googleapis.com/maps/api/staticmap?center=${locQuery}&zoom=14&size=640x360&scale=2&maptype=${mapTypeParam}&markers=color:red%7Clabel:V%7C${locQuery}&key=${googleMapsApiKey.trim()}`;
+    }
+    return null;
+  }, [googleMapsApiKey, fullAddress, property?.name, cityName, mapType]);
+
   const handleOpenMapExternal = () => {
-    const query = encodeURIComponent(`${property?.name || "Villa"}, Malavli, Lonavala`);
+    const query = encodeURIComponent(`${property?.name || "Villa"}, ${fullAddress}`);
     const url = Platform.select({
       ios: `maps:0,0?q=${query}`,
       android: `geo:0,0?q=${query}`,
@@ -244,20 +258,6 @@ export default function PropertyDetailScreen() {
       : 70000;
 
   const originalPrice = Math.round(basePrice * 1.25);
-
-  const cityName = property.address?.city || property.city || "Lonavala";
-  const addressLine = property.address?.addressLine || "Malavli";
-  const fullAddress = `${addressLine}, Boraj Road, Near Gharkul Society, ${cityName}`;
-  const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
-
-  const dynamicMapUri = useMemo(() => {
-    if (googleMapsApiKey && googleMapsApiKey.trim().length > 0) {
-      const locQuery = encodeURIComponent(fullAddress || `${property?.name || "Villa"}, ${cityName}`);
-      const mapTypeParam = mapType === "satellite" ? "satellite" : "roadmap";
-      return `https://maps.googleapis.com/maps/api/staticmap?center=${locQuery}&zoom=14&size=640x360&scale=2&maptype=${mapTypeParam}&markers=color:red%7Clabel:V%7C${locQuery}&key=${googleMapsApiKey.trim()}`;
-    }
-    return null;
-  }, [googleMapsApiKey, fullAddress, property?.name, cityName, mapType]);
 
   const maxGuests = property.maxCapacity || property.maxGuests || 8;
   const roomsCount = property.rooms || property.bedrooms || 2;
