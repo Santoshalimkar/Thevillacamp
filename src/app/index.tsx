@@ -1,10 +1,12 @@
 import { Text, View, StyleSheet } from "react-native";
-import "../../global.css";
+import { StatusBar } from "expo-status-bar";
 
 export default function Index() {
   return (
     <View style={styles.container}>
-      <Text className="text-red-500 font-bold">Edit src/app/index.tsx to edit this screen.</Text>
+      <StatusBar style="dark" animated />
+
+      <Text  >Edit src/app/index.tsx to edit this screen.</Text>
     </View>
   );
 }

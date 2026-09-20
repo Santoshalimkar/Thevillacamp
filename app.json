@@ -36,6 +36,13 @@
             "imageWidth": 76
           }
         }
+      ],
+     [
+        "expo-status-bar",
+        {
+          "hidden": false,
+          "style": "dark"
+        }
       ]
     ],
     "experiments": {
