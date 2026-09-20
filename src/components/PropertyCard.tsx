@@ -9,9 +9,11 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
   Platform,
+  Share,
 } from "react-native";
 import { Image } from "expo-image";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { Colors } from "../theme/colors";
@@ -19,8 +21,9 @@ import { PropertyItem } from "../services/propertyService";
 import { useWishlist } from "../context/WishlistContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const CARD_WIDTH = SCREEN_WIDTH - 28;
-const CARD_HEIGHT = 240;
+const CARD_MARGIN = 12;
+const CARD_WIDTH = SCREEN_WIDTH - CARD_MARGIN * 2;
+const IMAGE_HEIGHT = 220;
 
 interface PropertyCardProps {
   property: PropertyItem;
@@ -45,23 +48,43 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
     return ["https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=800"];
   })();
 
-  // Calculate pricing
-  const price =
-    property.price ||
-    property.basePrice ||
-    property.pricing?.basePrice ||
-    property.pricing?.weekdayPrice ||
-    12000;
+  // Pricing calculations matching villa-web
+  const basePrice: number =
+    typeof property.pricing?.weekdayPrice === "number"
+      ? property.pricing.weekdayPrice
+      : typeof property.price === "number"
+      ? property.price
+      : typeof property.basePrice === "number"
+      ? property.basePrice
+      : typeof property.pricing?.basePrice === "number"
+      ? property.pricing.basePrice
+      : 15000;
 
-  // Location display
-  const locationText =
+  const weekendPrice: number =
+    typeof property.pricing?.weekendPrice === "number"
+      ? property.pricing.weekendPrice
+      : typeof property.price === "number"
+      ? Math.round(property.price * 1.5)
+      : 35000;
+
+  // Address
+  const addressLine =
+    property.address?.addressLine ||
     property.address?.city ||
     property.city ||
-    property.address?.locationName ||
-    "Maharashtra, India";
+    "Malavli";
+  const city = property.address?.city || property.city || "Lonavala";
+  const locationText = `${addressLine}, ${city}`;
 
-  const ratingVal = (property.rating || 4.88).toFixed(1);
-  const reviewsCount = property.reviewCount || property.reviewsCount || 24;
+  const ratingVal = (property.rating || property.averageRating || 5.0).toFixed(1);
+  const maxGuests = property.maxCapacity || property.maxGuests || 8;
+  const bathsCount = property.baths != null ? property.baths : 2;
+
+  // Great for tag
+  const greatForTag =
+    Array.isArray(property.greatFor) && property.greatFor.length > 0
+      ? property.greatFor[0]
+      : "Ideal for Families";
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const slide = Math.round(event.nativeEvent.contentOffset.x / CARD_WIDTH);
@@ -76,7 +99,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
     } catch {}
     router.push({
       pathname: "/property/[id]",
-      params: { id: id || "", categoryId: property.categoryId || "" },
+      params: { id: id || "", categoryId: property.categoryId || property.category || "" },
     } as any);
   };
 
@@ -85,13 +108,27 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
     toggleWishlist(property);
   };
 
+  const handleShare = async (e: any) => {
+    e.stopPropagation();
+    try {
+      await Share.share({
+        message: `Check out ${property.name || property.title || "this luxury stay"} on The Villa & Camp: https://thevillacamp.com/view-Villa/${id}`,
+      });
+    } catch {}
+  };
+
+  const handlePressVideo = (e: any) => {
+    e.stopPropagation();
+    router.push("/(tabs)/shorts" as any);
+  };
+
   return (
     <TouchableOpacity
-      activeOpacity={0.93}
+      activeOpacity={0.94}
       onPress={handlePressCard}
       style={styles.cardContainer}
     >
-      {/* Photo Carousel Container */}
+      {/* 1. Photo Carousel Container */}
       <View style={styles.imageContainer}>
         <FlatList
           data={photos}
@@ -100,7 +137,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
           showsHorizontalScrollIndicator={false}
           onScroll={handleScroll}
           scrollEventThrottle={16}
-          keyExtractor={(_, index) => `img-${index}`}
+          keyExtractor={(_, index) => `card-img-${index}`}
           renderItem={({ item }) => (
             <Image
               source={{ uri: item }}
@@ -111,74 +148,195 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
           )}
         />
 
-        {/* Top Badges Row */}
-        <View style={styles.topRow}>
-          {property.isFeatured ? (
-            <View style={styles.featuredBadge}>
-              <Text style={styles.featuredText}>POPULAR</Text>
-            </View>
-          ) : (
-            <View style={styles.superhostBadge}>
-              <Text style={styles.superhostText}>VERIFIED</Text>
-            </View>
-          )}
+        {/* Top-Left: Red Gradient Most Booked Badge */}
+        <View style={styles.topLeftBadge}>
+          <LinearGradient
+            colors={["#DC2626", "#D97706"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.mostBookedGradient}
+          >
+            <Ionicons name="flame" size={12} color="#FEF08A" style={{ marginRight: 3 }} />
+            <Text style={styles.mostBookedText}>Most Booked</Text>
+          </LinearGradient>
+        </View>
 
-          {/* Heart Wishlist Button */}
+        {/* Top-Right: Heart and Share Action Buttons */}
+        <View style={styles.topRightActions}>
           <TouchableOpacity
-            style={styles.heartButton}
+            style={styles.circleBtn}
             onPress={handlePressHeart}
             activeOpacity={0.8}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Ionicons
               name={wishlisted ? "heart" : "heart-outline"}
-              size={20}
-              color={wishlisted ? Colors.heartRed : "#FFFFFF"}
+              size={17}
+              color={wishlisted ? "#FF5A1F" : "#374151"}
             />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.circleBtn}
+            onPress={handleShare}
+            activeOpacity={0.8}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="share-social-outline" size={16} color="#374151" />
           </TouchableOpacity>
         </View>
 
-        {/* Pagination Dots */}
+        {/* Bottom-Left: Video Badge Button */}
+        <TouchableOpacity
+          style={styles.videoBadge}
+          onPress={handlePressVideo}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="play" size={11} color="#FFFFFF" style={{ marginRight: 3 }} />
+          <Text style={styles.videoText}>Video</Text>
+        </TouchableOpacity>
+
+        {/* Bottom-Center: Carousel Dots */}
         {photos.length > 1 && (
           <View style={styles.paginationDots}>
-            {photos.slice(0, 5).map((_, idx) => (
+            {photos.slice(0, 6).map((_, idx) => (
               <View
                 key={`dot-${idx}`}
-                style={[styles.dot, activeImageIndex === idx && styles.dotActive]}
+                style={[
+                  styles.dot,
+                  activeImageIndex === idx ? styles.dotActive : styles.dotInactive,
+                ]}
               />
             ))}
           </View>
         )}
       </View>
 
-      {/* Property Details Container */}
-      <View style={styles.infoContainer}>
-        {/* Header Title & Rating */}
-        <View style={styles.headerRow}>
-          <Text style={styles.title} numberOfLines={1}>
-            {property.title || property.propertyName || "Luxury Private Villa"}
-          </Text>
+      {/* 2. Content Details Section */}
+      <View style={styles.contentContainer}>
+        {/* Title, Verified Checkmark & Rating */}
+        <View style={styles.titleRow}>
+          <View style={styles.titleLeft}>
+            <View style={styles.titleWithBadge}>
+              <Text style={styles.propertyTitle} numberOfLines={1}>
+                {property.name || property.title || "Vastalya Villa"}
+              </Text>
+              <Ionicons
+                name="checkmark-circle"
+                size={16}
+                color="#059669"
+                style={{ marginLeft: 4 }}
+              />
+            </View>
+            {/* Location */}
+            <View style={styles.locationRow}>
+              <Ionicons name="location-sharp" size={13} color="#FF5A1F" style={{ marginRight: 3 }} />
+              <Text style={styles.locationText} numberOfLines={1}>
+                {locationText}
+              </Text>
+            </View>
+          </View>
+
+          {/* Rating Pill */}
           <View style={styles.ratingBox}>
-            <Ionicons name="star" size={14} color={Colors.ratingGold} />
-            <Text style={styles.ratingText}>
-              {ratingVal}
-              <Text style={styles.ratingCount}> ({reviewsCount})</Text>
-            </Text>
+            <Ionicons name="star" size={13} color="#F59E0B" style={{ marginRight: 3 }} />
+            <Text style={styles.ratingText}>{ratingVal} of 5</Text>
           </View>
         </View>
 
-        {/* Location & Specs */}
-        <Text style={styles.location} numberOfLines={1}>
-          {locationText} • {property.maxGuests || 8} Guests • {property.bedrooms || 3} BHK
-        </Text>
-
-        {/* Pricing Row */}
-        <View style={styles.priceRow}>
-          <Text style={styles.priceAmount}>
-            ₹{price.toLocaleString("en-IN")}
-          </Text>
-          <Text style={styles.priceUnit}> / night</Text>
-          <Text style={styles.taxesText}>+ taxes</Text>
+        {/* Capacity Specs Pills */}
+        <View style={styles.specsRow}>
+          <View style={styles.specPill}>
+            <Ionicons name="people-outline" size={13} color="#FF5A1F" style={{ marginRight: 4 }} />
+            <Text style={styles.specText}>Upto {maxGuests} Guests</Text>
+          </View>
+          <View style={styles.specPill}>
+            <Ionicons name="water-outline" size={13} color="#FF5A1F" style={{ marginRight: 4 }} />
+            <Text style={styles.specText}>{bathsCount} Baths</Text>
+          </View>
         </View>
+
+        {/* Great For Pill */}
+        <View style={styles.greatForRow}>
+          <Text style={styles.greatForLabel}>Great for:</Text>
+          <View style={styles.greatForPill}>
+            <Ionicons name="people" size={12} color="#059669" style={{ marginRight: 4 }} />
+            <Text style={styles.greatForText}>{greatForTag}</Text>
+          </View>
+        </View>
+
+        {/* 5-Column Amenities Row (Matching Screenshot 1) */}
+        <View style={styles.amenitiesGrid}>
+          <View style={styles.amenityCol}>
+            <View style={styles.amenityIconBox}>
+              <MaterialCommunityIcons name="air-conditioner" size={18} color="#4B5563" />
+            </View>
+            <Text style={styles.amenityName} numberOfLines={1}>AC</Text>
+          </View>
+
+          <View style={styles.amenityCol}>
+            <View style={styles.amenityIconBox}>
+              <Ionicons name="battery-charging-outline" size={18} color="#4B5563" />
+            </View>
+            <Text style={styles.amenityName} numberOfLines={1}>Power Backup</Text>
+          </View>
+
+          <View style={styles.amenityCol}>
+            <View style={styles.amenityIconBox}>
+              <MaterialCommunityIcons name="pool" size={18} color="#4B5563" />
+            </View>
+            <Text style={styles.amenityName} numberOfLines={1}>Swimming Pool</Text>
+          </View>
+
+          <View style={styles.amenityCol}>
+            <View style={styles.amenityIconBox}>
+              <Ionicons name="volume-high-outline" size={18} color="#4B5563" />
+            </View>
+            <Text style={styles.amenityName} numberOfLines={1}>Sound System</Text>
+          </View>
+
+          <View style={styles.amenityCol}>
+            <View style={styles.amenityIconBox}>
+              <MaterialCommunityIcons name="flower" size={18} color="#4B5563" />
+            </View>
+            <Text style={styles.amenityName} numberOfLines={1}>Garden</Text>
+          </View>
+        </View>
+
+        {/* Divider */}
+        <View style={styles.divider} />
+
+        {/* Price & Book Now CTA */}
+        <View style={styles.pricingRow}>
+          <View style={styles.priceLeft}>
+            <Text style={styles.priceLabel}>Price start</Text>
+            <Text style={styles.priceSub}>for 1 Nights</Text>
+          </View>
+
+          <View style={styles.priceRight}>
+            <Text style={styles.priceAmount}>₹{basePrice.toLocaleString("en-IN")}</Text>
+            {weekendPrice > basePrice && (
+              <Text style={styles.weekendPriceText}>
+                Weekend ₹{weekendPrice.toLocaleString("en-IN")}
+              </Text>
+            )}
+          </View>
+        </View>
+
+        {/* Book Now Button */}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={handlePressCard}
+          style={styles.bookNowButton}
+        >
+          <LinearGradient
+            colors={["#FF5A1F", "#EA580C"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.bookNowGradient}
+          >
+            <Text style={styles.bookNowText}>Book Now →</Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
@@ -186,19 +344,19 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
 
 const styles = StyleSheet.create({
   cardContainer: {
-    marginHorizontal: 14,
-    marginBottom: 20,
+    marginHorizontal: CARD_MARGIN,
+    marginBottom: 16,
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 10,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: "#E5E7EB",
+    overflow: "hidden",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
       },
       android: {
         elevation: 2,
@@ -207,139 +365,265 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     width: "100%",
-    height: CARD_HEIGHT,
-    borderRadius: 16,
-    overflow: "hidden",
-    position: "relative",
+    height: IMAGE_HEIGHT,
     backgroundColor: "#F3F4F6",
+    position: "relative",
   },
   cardImage: {
-    width: CARD_WIDTH - 20,
-    height: CARD_HEIGHT,
+    width: CARD_WIDTH,
+    height: IMAGE_HEIGHT,
   },
-  topRow: {
+  topLeftBadge: {
     position: "absolute",
     top: 10,
     left: 10,
+    zIndex: 10,
+  },
+  mostBookedGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 14,
+  },
+  mostBookedText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  topRightActions: {
+    position: "absolute",
+    top: 10,
     right: 10,
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    gap: 7,
+    zIndex: 10,
   },
-  featuredBadge: {
-    backgroundColor: "#FF5A1F",
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  featuredText: {
-    color: "#FFFFFF",
-    fontSize: 9,
-    fontWeight: "800",
-    letterSpacing: 0.6,
-  },
-  superhostBadge: {
-    backgroundColor: "rgba(17, 24, 39, 0.75)",
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 0.5,
-    borderColor: "rgba(255, 255, 255, 0.25)",
-  },
-  superhostText: {
-    color: "#FFFFFF",
-    fontSize: 9,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  heartButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "rgba(17, 24, 39, 0.5)",
+  circleBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.94)",
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 0.5,
+    borderColor: "rgba(0, 0, 0, 0.08)",
+  },
+  videoBadge: {
+    position: "absolute",
+    bottom: 10,
+    left: 10,
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 14,
+    zIndex: 10,
+  },
+  videoText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "600",
   },
   paginationDots: {
     position: "absolute",
-    bottom: 10,
-    left: 0,
-    right: 0,
+    bottom: 8,
+    alignSelf: "center",
     flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
     gap: 4,
+    backgroundColor: "rgba(0, 0, 0, 0.35)",
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
+    zIndex: 10,
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "rgba(255, 255, 255, 0.5)",
+    height: 4,
+    borderRadius: 2,
   },
   dotActive: {
-    width: 16,
-    height: 6,
-    borderRadius: 3,
+    width: 14,
     backgroundColor: "#FFFFFF",
   },
-  infoContainer: {
-    paddingHorizontal: 4,
-    paddingTop: 10,
-    paddingBottom: 2,
+  dotInactive: {
+    width: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.6)",
   },
-  headerRow: {
+  contentContainer: {
+    padding: 13,
+  },
+  titleRow: {
     flexDirection: "row",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    alignItems: "center",
+    marginBottom: 8,
   },
-  title: {
+  titleLeft: {
     flex: 1,
+    marginRight: 8,
+  },
+  titleWithBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 3,
+  },
+  propertyTitle: {
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "800",
     color: "#111827",
     letterSpacing: -0.2,
-    marginRight: 8,
+    flexShrink: 1,
+  },
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  locationText: {
+    fontSize: 12,
+    color: "#6B7280",
+    fontWeight: "500",
+    flex: 1,
   },
   ratingBox: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
+    backgroundColor: "#FEF3C7",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: "#FDE68A",
   },
   ratingText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "700",
-    color: "#111827",
+    color: "#92400E",
   },
-  ratingCount: {
+  specsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  specPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F3F4F6",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 7,
+  },
+  specText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#374151",
+  },
+  greatForRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 11,
+  },
+  greatForLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#6B7280",
+  },
+  greatForPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ECFDF5",
+    borderWidth: 0.5,
+    borderColor: "#A7F3D0",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 14,
+  },
+  greatForText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#065F46",
+  },
+  amenitiesGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 4,
+    marginBottom: 10,
+  },
+  amenityCol: {
+    alignItems: "center",
+    flex: 1,
+  },
+  amenityIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 9,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 3,
+  },
+  amenityName: {
+    fontSize: 9,
+    fontWeight: "600",
+    color: "#4B5563",
+    textAlign: "center",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#F3F4F6",
+    marginBottom: 10,
+  },
+  pricingRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    marginBottom: 11,
+  },
+  priceLeft: {
+    justifyContent: "center",
+  },
+  priceLabel: {
+    fontSize: 12,
     fontWeight: "500",
     color: "#6B7280",
+  },
+  priceSub: {
     fontSize: 11,
+    fontWeight: "400",
+    color: "#9CA3AF",
   },
-  location: {
-    fontSize: 12,
-    color: "#4B5563",
-    marginTop: 4,
-    fontWeight: "500",
-  },
-  priceRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    marginTop: 6,
+  priceRight: {
+    alignItems: "flex-end",
   },
   priceAmount: {
-    fontSize: 16,
-    fontWeight: "800",
+    fontSize: 18,
+    fontWeight: "900",
     color: "#111827",
     letterSpacing: -0.3,
   },
-  priceUnit: {
-    fontSize: 13,
+  weekendPriceText: {
+    fontSize: 10,
+    fontWeight: "600",
     color: "#6B7280",
-    fontWeight: "500",
+    marginTop: 1,
   },
-  taxesText: {
-    fontSize: 11,
-    color: "#9CA3AF",
-    marginLeft: 6,
+  bookNowButton: {
+    borderRadius: 11,
+    overflow: "hidden",
+  },
+  bookNowGradient: {
+    paddingVertical: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bookNowText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "800",
+    letterSpacing: 0.2,
   },
 });

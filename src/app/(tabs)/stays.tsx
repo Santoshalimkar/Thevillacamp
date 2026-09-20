@@ -8,9 +8,12 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   ScrollView,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
 import { Colors } from "../../theme/colors";
 import { VillaHeader } from "../../components/VillaHeader";
 import { PropertyCard } from "../../components/PropertyCard";
@@ -27,6 +30,7 @@ const CATEGORY_CHIPS = [
 ];
 
 export default function StaysScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const {
     activeCategoryId,
@@ -80,14 +84,28 @@ export default function StaysScreen() {
     loadData();
   };
 
-  const bottomPadding = Math.max(insets.bottom, 10) + 75;
+  const handleOpenFilters = async () => {
+    try {
+      await Haptics.selectionAsync();
+    } catch {}
+    router.push("/modal/search" as any);
+  };
+
+  const handleOpenMapView = async () => {
+    try {
+      await Haptics.selectionAsync();
+    } catch {}
+    router.push("/search-your-gateway" as any);
+  };
+
+  const bottomPadding = Math.max(insets.bottom, 10) + 95;
 
   return (
     <View style={styles.container}>
-      {/* Safe Area Top Inset Header */}
+      {/* 1. Safe Area Top Inset Header with Search Pill */}
       <VillaHeader />
 
-      {/* Category Horizontal Filter Bar */}
+      {/* 2. Category Horizontal Filter Bar */}
       <View style={styles.chipsBar}>
         <ScrollView
           horizontal
@@ -119,7 +137,7 @@ export default function StaysScreen() {
         </ScrollView>
       </View>
 
-      {/* Main List */}
+      {/* 3. Main Property List */}
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.primary} />
@@ -158,6 +176,36 @@ export default function StaysScreen() {
           }
         />
       )}
+
+      {/* 4. Floating Pill: "Filters 1 | 🗺️ Map View" (Matching Screenshot 1) */}
+      <View
+        style={[
+          styles.floatingBottomPillContainer,
+          { bottom: Math.max(insets.bottom, 8) + 68 },
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.pillButton}
+          activeOpacity={0.85}
+          onPress={handleOpenFilters}
+        >
+          <Text style={styles.pillText}>Filters</Text>
+          <View style={styles.filterBadge}>
+            <Text style={styles.filterBadgeText}>1</Text>
+          </View>
+        </TouchableOpacity>
+
+        <View style={styles.pillDivider} />
+
+        <TouchableOpacity
+          style={styles.pillButton}
+          activeOpacity={0.85}
+          onPress={handleOpenMapView}
+        >
+          <Ionicons name="map-outline" size={14} color="#FFFFFF" style={{ marginRight: 5 }} />
+          <Text style={styles.pillText}>Map View</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Floating AI Concierge Mascot */}
       <FloatingMascot />
@@ -260,5 +308,60 @@ const styles = StyleSheet.create({
     color: "#FF5A1F",
     fontSize: 13,
     fontWeight: "700",
+  },
+  floatingBottomPillContainer: {
+    position: "absolute",
+    alignSelf: "center",
+    backgroundColor: "#111827",
+    borderRadius: 28,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    zIndex: 100,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.15)",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+  },
+  pillButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  pillText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  filterBadge: {
+    marginLeft: 6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#EA580C",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  pillDivider: {
+    width: 1,
+    height: 18,
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
+    marginHorizontal: 4,
   },
 });

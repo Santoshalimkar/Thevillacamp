@@ -72,6 +72,14 @@ export interface PropertyItem {
   propertyName?: string;
   bedrooms?: number;
   rooms?: number;
+  baths?: number;
+  maxCapacity?: number;
+  averageRating?: number;
+  totalReviews?: number;
+  greatFor?: string[];
+  topamenities?: string[];
+  reelVideo?: string;
+  owner?: any;
   isSuperhost?: boolean;
   badge?: string;
 }
