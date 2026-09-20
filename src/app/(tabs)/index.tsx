@@ -3,18 +3,19 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  ScrollView,
   RefreshControl,
   ActivityIndicator,
-  SafeAreaView,
   TouchableOpacity,
-  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../theme/colors";
-import { SearchHeader } from "../../components/SearchHeader";
-import { CategoryBar } from "../../components/CategoryBar";
+import { VillaHeader } from "../../components/VillaHeader";
+import { VillaHero } from "../../components/VillaHero";
+import { ExploreCategories } from "../../components/ExploreCategories";
 import { PropertyCard } from "../../components/PropertyCard";
+import { FloatingMascot } from "../../components/FloatingMascot";
 import {
   fetchProperties,
   fetchWeekendProperties,
@@ -22,22 +23,11 @@ import {
 } from "../../services/propertyService";
 import { useSearch } from "../../context/SearchContext";
 
-const POPULAR_DESTINATIONS = [
-  "All",
-  "Lonavala",
-  "Alibaug",
-  "Pawna Lake",
-  "Karjat",
-  "Igatpuri",
-  "Mahabaleshwar",
-  "Goa",
-];
-
-export default function ExploreScreen() {
+export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
   const {
     activeCategoryId,
     destination,
-    setDestination,
     checkIn,
     checkOut,
     priceMin,
@@ -61,7 +51,7 @@ export default function ExploreScreen() {
         priceMax: priceMax !== null ? priceMax : undefined,
         checkIn: checkIn || undefined,
         checkOut: checkOut || undefined,
-        limit: 25,
+        limit: 15,
       });
 
       if (res?.success && Array.isArray(res.data)) {
@@ -70,7 +60,7 @@ export default function ExploreScreen() {
         setProperties([]);
       }
 
-      // Fetch weekend deals on initial load
+      // Fetch weekend deals
       const weekendRes = await fetchWeekendProperties(activeCategoryId || undefined);
       if (weekendRes?.success && Array.isArray(weekendRes.data)) {
         setWeekendStays(weekendRes.data.slice(0, 4));
@@ -93,179 +83,190 @@ export default function ExploreScreen() {
     loadData();
   };
 
-  const handleSelectDestinationTag = (dest: string) => {
-    if (dest === "All") {
-      setDestination("");
-    } else {
-      setDestination(dest);
-    }
-  };
+  const bottomPadding = Math.max(insets.bottom, 10) + 85;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      {/* Floating Airbnb Search Pill */}
-      <SearchHeader />
+    <View style={styles.screen}>
+      {/* 1. Top Location Bar & Floating Search Pill with Safe Area Inset */}
+      <VillaHeader />
 
-      {/* Category Slider */}
-      <CategoryBar />
+      {/* 2. Scrollable Body */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPadding }]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.primary}
+            colors={[Colors.primary]}
+          />
+        }
+      >
+        {/* 3. Hero Section matching Villa-web Hero.js & mobile screenshot */}
+        <VillaHero />
 
-      {/* Quick Destination Chips */}
-      <View style={styles.chipsRow}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContent}>
-          {POPULAR_DESTINATIONS.map((dest) => {
-            const isSelected =
-              dest === "All" ? !destination : destination.toLowerCase() === dest.toLowerCase();
-            return (
-              <TouchableOpacity
-                key={dest}
-                activeOpacity={0.7}
-                onPress={() => handleSelectDestinationTag(dest)}
-                style={[styles.chip, isSelected && styles.chipSelected]}
-              >
-                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
-                  {dest}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
+        {/* 4. Explore by Categories Section matching Villa-web */}
+        <ExploreCategories />
 
-      {/* Main Feed */}
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Finding extraordinary stays...</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={properties}
-          keyExtractor={(item, index) => item._id || item.id || `prop-${index}`}
-          renderItem={({ item }) => <PropertyCard property={item} />}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={Colors.primary}
-              colors={[Colors.primary]}
-            />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <View style={styles.emptyIconCircle}>
-                <Ionicons name="search-outline" size={32} color={Colors.textSecondary} />
-              </View>
-              <Text style={styles.emptyTitle}>No stays match your criteria</Text>
-              <Text style={styles.emptySubtitle}>
-                Try adjusting your search location, dates, or price filters.
-              </Text>
-              {isFiltered && (
-                <TouchableOpacity style={styles.clearBtn} onPress={clearFilters}>
-                  <Text style={styles.clearBtnText}>Clear all filters</Text>
-                </TouchableOpacity>
-              )}
+        {/* 5. Featured Stays Feed */}
+        <View style={styles.sectionHeader}>
+          <View>
+            <View style={styles.sectionBadge}>
+              <Ionicons name="sparkles" size={11} color="#FF5A1F" style={{ marginRight: 3 }} />
+              <Text style={styles.sectionBadgeText}>TOP RATED EXPERIENCES</Text>
             </View>
-          }
-        />
-      )}
-    </SafeAreaView>
+            <Text style={styles.sectionTitle}>
+              Featured <Text style={{ color: Colors.primary }}>Verified Stays</Text>
+            </Text>
+          </View>
+
+          {isFiltered && (
+            <TouchableOpacity onPress={clearFilters} style={styles.resetPill}>
+              <Text style={styles.resetPillText}>Reset</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.loadingText}>Curating extraordinary stays...</Text>
+          </View>
+        ) : properties.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <View style={styles.emptyIconCircle}>
+              <Ionicons name="search-outline" size={32} color="#9CA3AF" />
+            </View>
+            <Text style={styles.emptyTitle}>No stays match your criteria</Text>
+            <Text style={styles.emptySubtitle}>
+              Try adjusting your search location, dates, or category filters.
+            </Text>
+            {isFiltered && (
+              <TouchableOpacity style={styles.clearBtn} onPress={clearFilters}>
+                <Text style={styles.clearBtnText}>Clear all filters</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          <View style={styles.feedList}>
+            {properties.map((item, index) => (
+              <PropertyCard
+                key={item._id || item.id || `home-stay-${index}`}
+                property={item}
+              />
+            ))}
+          </View>
+        )}
+      </ScrollView>
+
+      {/* 6. Floating AI Mascot Avatar with Green Online Status Dot */}
+      <FloatingMascot />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  screen: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: "#F8F9FA",
   },
-  chipsRow: {
-    paddingVertical: 10,
-    backgroundColor: Colors.background,
+  scrollContent: {
+    backgroundColor: "#FFFFFF",
   },
-  chipsContent: {
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
-    gap: 8,
+    paddingTop: 20,
+    paddingBottom: 14,
+    backgroundColor: "#FFFFFF",
   },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: Colors.card,
+  sectionBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  sectionBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#FF5A1F",
+    letterSpacing: 0.6,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#111827",
+    letterSpacing: -0.3,
+  },
+  resetPill: {
+    backgroundColor: "#FFF7ED",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: "#FF5A1F",
   },
-  chipSelected: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  chipText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: Colors.textSecondary,
-  },
-  chipTextSelected: {
-    color: "#FFFFFF",
+  resetPillText: {
+    fontSize: 12,
     fontWeight: "700",
+    color: "#FF5A1F",
   },
-  listContent: {
-    paddingTop: 8,
-    paddingBottom: 24,
+  feedList: {
+    backgroundColor: "#FFFFFF",
   },
   loadingContainer: {
-    flex: 1,
+    paddingVertical: 50,
     alignItems: "center",
     justifyContent: "center",
-    padding: 32,
   },
   loadingText: {
-    marginTop: 14,
-    color: Colors.textSecondary,
-    fontSize: 14,
+    color: "#6B7280",
+    fontSize: 13,
+    marginTop: 12,
     fontWeight: "500",
   },
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 64,
-    paddingHorizontal: 32,
+    padding: 40,
   },
   emptyIconCircle: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: Colors.card,
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "700",
-    color: Colors.text,
-    textAlign: "center",
+    color: "#111827",
   },
   emptySubtitle: {
-    fontSize: 14,
-    color: Colors.textSecondary,
+    fontSize: 13,
+    color: "#6B7280",
     textAlign: "center",
-    marginTop: 8,
-    lineHeight: 20,
+    marginTop: 6,
+    lineHeight: 18,
   },
   clearBtn: {
-    marginTop: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 24,
-    backgroundColor: Colors.cardSecondary,
+    marginTop: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 20,
+    backgroundColor: "#FFF7ED",
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: "#FF5A1F",
   },
   clearBtnText: {
-    color: Colors.primary,
+    color: "#FF5A1F",
+    fontSize: 13,
     fontWeight: "700",
-    fontSize: 14,
   },
 });

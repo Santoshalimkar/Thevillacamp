@@ -13,6 +13,7 @@ import {
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { Colors } from "../../theme/colors";
 import { useAuth } from "../../context/AuthContext";
@@ -29,6 +30,7 @@ import { RAZORPAY_KEY_ID } from "../../services/api";
 
 export default function BookingScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id, categoryId } = useLocalSearchParams<{ id: string; categoryId?: string }>();
   const { user, isAuthenticated, openAuthModal } = useAuth();
 
@@ -201,7 +203,7 @@ export default function BookingScreen() {
     "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=400";
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.safeArea, { paddingTop: Math.max(insets.top, 10) }]}>
       {/* Top Bar */}
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
@@ -409,7 +411,7 @@ export default function BookingScreen() {
           Alert.alert("Payment Cancelled or Failed", err?.description || "Payment was not completed.");
         }}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

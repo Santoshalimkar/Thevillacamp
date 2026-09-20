@@ -13,6 +13,7 @@ interface SearchContextType {
   activeCategory: string;
   setActiveCategory: (cat: string) => void;
   activeCategoryId: string;
+  setActiveCategoryId: (catIdOrSlug: string | null) => void;
   priceMin: number | null;
   priceMax: number | null;
   setPriceRange: (min: number | null, max: number | null) => void;
@@ -34,6 +35,21 @@ export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const matchedCat = CATEGORIES.find((c) => c.slug === activeCategory);
   const activeCategoryId = matchedCat?.categoryId || "";
+
+  const setActiveCategoryId = (catIdOrSlug: string | null) => {
+    if (!catIdOrSlug || catIdOrSlug === "all") {
+      setActiveCategory("all");
+      return;
+    }
+    const found = CATEGORIES.find(
+      (c) => c.slug === catIdOrSlug || c.categoryId === catIdOrSlug || c.id === catIdOrSlug
+    );
+    if (found) {
+      setActiveCategory(found.slug);
+    } else {
+      setActiveCategory(catIdOrSlug);
+    }
+  };
 
   const setPriceRange = (min: number | null, max: number | null) => {
     setPriceMin(min);
@@ -88,6 +104,7 @@ export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         activeCategory,
         setActiveCategory,
         activeCategoryId,
+        setActiveCategoryId,
         priceMin,
         priceMax,
         setPriceRange,

@@ -3,16 +3,17 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
   Linking,
+  Platform,
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../theme/colors";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -22,6 +23,7 @@ import {
 
 export default function TripsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user, isAuthenticated, openAuthModal } = useAuth();
   const [bookings, setBookings] = useState<BookingItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -59,84 +61,85 @@ export default function TripsScreen() {
   };
 
   const handleOpenVoucherSupport = (booking: BookingItem) => {
-    const bookingCode = booking.bookingId || booking._id?.slice(-8).toUpperCase();
     const text = encodeURIComponent(
-      `Hello The Villa & Camp! I need assistance with my booking #${bookingCode} for ${booking.property?.name || "my stay"}.`
+      `Hello The Villa & Camp! I have a question regarding my booking #${booking.orderId || booking._id || ""}.`
     );
     Linking.openURL(`https://wa.me/919820000000?text=${text}`);
   };
 
-  if (!isAuthenticated) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Trips</Text>
-        </View>
-        <View style={styles.authPromptContainer}>
-          <View style={styles.authIconCircle}>
-            <Ionicons name="briefcase-outline" size={40} color={Colors.primary} />
-          </View>
-          <Text style={styles.authPromptTitle}>No trips booked... yet!</Text>
-          <Text style={styles.authPromptSubtitle}>
-            Log in with your WhatsApp number to access your upcoming trip vouchers, check-in guides, and reservation history.
-          </Text>
-          <TouchableOpacity style={styles.loginBtn} onPress={openAuthModal}>
-            <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" />
-            <Text style={styles.loginBtnText}>Log In with WhatsApp</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const bottomPadding = Math.max(insets.bottom, 10) + 80;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.container, { paddingTop: Math.max(insets.top, 10) }]}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Trips</Text>
-        <Text style={styles.headerSubtitle}>
-          {bookings.length} {bookings.length === 1 ? "reservation" : "reservations"}
+        <Text style={styles.headerTag}>RESERVATIONS & PASSES</Text>
+        <Text style={styles.headerTitle}>
+          My <Text style={{ color: Colors.primary }}>Bookings</Text>
         </Text>
       </View>
 
-      {loading && !refreshing ? (
-        <View style={styles.centerContainer}>
+      {!isAuthenticated ? (
+        <View style={styles.authBannerContainer}>
+          <View style={styles.authCard}>
+            <View style={styles.authIconCircle}>
+              <Ionicons name="calendar" size={32} color={Colors.primary} />
+            </View>
+            <Text style={styles.authTitle}>Sign in to view your trips</Text>
+            <Text style={styles.authSubtitle}>
+              Log in with your WhatsApp number to view upcoming check-ins, access booking vouchers, and connect with hosts.
+            </Text>
+            <TouchableOpacity
+              activeOpacity={0.88}
+              style={styles.authButton}
+              onPress={openAuthModal}
+            >
+              <Ionicons name="logo-whatsapp" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+              <Text style={styles.authButtonText}>Sign In via WhatsApp</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : loading ? (
+        <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Fetching your reservations...</Text>
         </View>
       ) : bookings.length === 0 ? (
-        <View style={styles.authPromptContainer}>
-          <View style={styles.authIconCircle}>
-            <Ionicons name="compass-outline" size={40} color={Colors.textSecondary} />
+        <View style={styles.emptyContainer}>
+          <View style={styles.emptyIconCircle}>
+            <Ionicons name="briefcase-outline" size={36} color="#9CA3AF" />
           </View>
-          <Text style={styles.authPromptTitle}>No reservations found</Text>
-          <Text style={styles.authPromptSubtitle}>
-            When you book a villa or campsite, your vouchers, direction pins, and host access codes will appear here.
+          <Text style={styles.emptyTitle}>No trips booked... yet!</Text>
+          <Text style={styles.emptySubtitle}>
+            Time to dust off your bags and start planning your next lakeside or private pool escape.
           </Text>
           <TouchableOpacity
             style={styles.exploreBtn}
-            onPress={() => router.push("/(tabs)/" as any)}
+            onPress={() => router.push("/(tabs)/stays" as any)}
           >
-            <Text style={styles.exploreBtnText}>Start Exploring</Text>
+            <Text style={styles.exploreBtnText}>Start Exploring Stays</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <FlatList
           data={bookings}
-          keyExtractor={(item) => item._id || item.bookingId || Math.random().toString()}
-          contentContainerStyle={styles.listContent}
+          keyExtractor={(item, index) => item._id || item.orderId || `booking-${index}`}
+          contentContainerStyle={[styles.listContent, { paddingBottom: bottomPadding }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
               tintColor={Colors.primary}
+              colors={[Colors.primary]}
             />
           }
           renderItem={({ item }) => {
             const photo =
               item.property?.images?.[0] ||
-              "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=600";
-            const bookingIdCode =
-              item.bookingId || item._id?.slice(-8).toUpperCase() || "TVC-STAY";
+              item.property?.propertyImage ||
+              "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=800";
+            const bookingIdCode = (item.orderId || item._id || "VC").slice(-6).toUpperCase();
             const isConfirmed =
               item.bookingStatus === "CONFIRMED" || item.paymentStatus === "PAID";
 
@@ -171,7 +174,7 @@ export default function TripsScreen() {
                   </Text>
 
                   <View style={styles.tripDatesRow}>
-                    <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} />
+                    <Ionicons name="calendar-outline" size={14} color="#6B7280" />
                     <Text style={styles.tripDatesText}>
                       {item.checkIn} → {item.checkOut}
                     </Text>
@@ -185,7 +188,7 @@ export default function TripsScreen() {
                       style={styles.whatsappHelpBtn}
                       onPress={() => handleOpenVoucherSupport(item)}
                     >
-                      <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+                      <Ionicons name="logo-whatsapp" size={15} color="#25D366" />
                       <Text style={styles.whatsappHelpText}>Voucher Help</Text>
                     </TouchableOpacity>
                   </View>
@@ -195,107 +198,170 @@ export default function TripsScreen() {
           }}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: "#F8F9FA",
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
+    borderBottomColor: "#E5E7EB",
+  },
+  headerTag: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#FF5A1F",
+    letterSpacing: 0.6,
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: Colors.text,
-    letterSpacing: -0.5,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginTop: 4,
-  },
-  centerContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  authPromptContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 36,
-  },
-  authIconCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: Colors.card,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 20,
-  },
-  authPromptTitle: {
     fontSize: 20,
     fontWeight: "800",
-    color: Colors.text,
+    color: "#111827",
+    marginTop: 2,
+    letterSpacing: -0.3,
+  },
+  authBannerContainer: {
+    padding: 20,
+    marginTop: 30,
+  },
+  authCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    alignItems: "center",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
+  },
+  authIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#FFF7ED",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#FDBA74",
+  },
+  authTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#111827",
     textAlign: "center",
   },
-  authPromptSubtitle: {
-    fontSize: 14,
-    color: Colors.textSecondary,
+  authSubtitle: {
+    fontSize: 13,
+    color: "#6B7280",
     textAlign: "center",
     marginTop: 8,
-    lineHeight: 22,
+    lineHeight: 18,
   },
-  loginBtn: {
+  authButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginTop: 24,
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 13,
-    borderRadius: 28,
+    backgroundColor: "#25D366",
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 24,
+    marginTop: 20,
   },
-  loginBtnText: {
+  authButtonText: {
     color: "#FFFFFF",
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 32,
+  },
+  loadingText: {
+    color: "#6B7280",
+    fontSize: 13,
+    marginTop: 12,
+    fontWeight: "500",
+  },
+  emptyContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 36,
+    marginTop: 40,
+  },
+  emptyIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: "#6B7280",
+    textAlign: "center",
+    marginTop: 6,
+    lineHeight: 18,
   },
   exploreBtn: {
-    marginTop: 24,
-    backgroundColor: Colors.cardSecondary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: Colors.primary,
+    marginTop: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    borderRadius: 24,
+    backgroundColor: "#FF5A1F",
   },
   exploreBtnText: {
-    color: Colors.primary,
+    color: "#FFFFFF",
+    fontSize: 13,
     fontWeight: "700",
-    fontSize: 15,
   },
   listContent: {
-    padding: 16,
-    gap: 16,
+    padding: 14,
   },
   tripCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: "#FFFFFF",
     borderRadius: 18,
-    borderWidth: 1,
-    borderColor: Colors.border,
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    marginBottom: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   tripImage: {
     width: "100%",
@@ -308,12 +374,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 6,
   },
   bookingIdText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: Colors.textSecondary,
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#9CA3AF",
+    letterSpacing: 0.5,
   },
   statusBadge: {
     paddingHorizontal: 8,
@@ -321,29 +387,35 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   badgeConfirmed: {
-    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    backgroundColor: "#ECFDF5",
+    borderWidth: 0.5,
+    borderColor: "#A7F3D0",
   },
   badgePending: {
-    backgroundColor: "rgba(245, 158, 11, 0.15)",
+    backgroundColor: "#FFFBEB",
+    borderWidth: 0.5,
+    borderColor: "#FDE68A",
   },
   statusText: {
-    fontSize: 11,
-    fontWeight: "700",
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
   },
   statusTextConfirmed: {
-    color: Colors.success,
+    color: "#059669",
   },
   statusTextPending: {
-    color: Colors.warning,
+    color: "#D97706",
   },
   tripPropName: {
     fontSize: 16,
     fontWeight: "700",
-    color: Colors.text,
+    color: "#111827",
+    marginTop: 6,
   },
   tripLocation: {
-    fontSize: 13,
-    color: Colors.textSecondary,
+    fontSize: 12,
+    color: "#6B7280",
     marginTop: 2,
   },
   tripDatesRow: {
@@ -353,35 +425,38 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   tripDatesText: {
-    fontSize: 13,
-    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#4B5563",
   },
   tripFooter: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
+    alignItems: "center",
     marginTop: 12,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: Colors.divider,
+    borderTopColor: "#F3F4F6",
   },
   tripPrice: {
     fontSize: 16,
     fontWeight: "800",
-    color: Colors.text,
+    color: "#111827",
   },
   whatsappHelpBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    backgroundColor: "rgba(37, 211, 102, 0.12)",
+    backgroundColor: "#F0FDF4",
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+    gap: 4,
   },
   whatsappHelpText: {
+    color: "#15803D",
     fontSize: 12,
     fontWeight: "700",
-    color: "#25D366",
   },
 });

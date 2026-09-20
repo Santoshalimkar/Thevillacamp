@@ -62,6 +62,9 @@ export interface PropertyItem {
   checkInTime?: string;
   checkOutTime?: string;
   featured?: boolean;
+  isFeatured?: boolean;
+  propertyName?: string;
+  bedrooms?: number;
   isSuperhost?: boolean;
 }
 

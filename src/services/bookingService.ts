@@ -23,12 +23,14 @@ export interface BookingPayload {
 
 export interface BookingItem {
   _id: string;
+  orderId?: string;
   bookingId?: string;
   property?: {
     _id: string;
     name: string;
     title?: string;
     images?: string[];
+    propertyImage?: string;
     address?: {
       city?: string;
       addressLine?: string;

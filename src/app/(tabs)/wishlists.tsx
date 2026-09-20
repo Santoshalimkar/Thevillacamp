@@ -4,24 +4,30 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  SafeAreaView,
   TouchableOpacity,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../theme/colors";
 import { PropertyCard } from "../../components/PropertyCard";
 import { useWishlist } from "../../context/WishlistContext";
 
 export default function WishlistsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { wishlistItems, wishlistIds } = useWishlist();
 
+  const bottomPadding = Math.max(insets.bottom, 10) + 80;
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.container, { paddingTop: Math.max(insets.top, 10) }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Wishlists</Text>
+        <Text style={styles.headerTag}>FAVORITES</Text>
+        <Text style={styles.headerTitle}>
+          Saved <Text style={{ color: Colors.primary }}>Wishlists</Text>
+        </Text>
         <Text style={styles.headerSubtitle}>
           {wishlistIds.length} {wishlistIds.length === 1 ? "saved stay" : "saved stays"}
         </Text>
@@ -38,7 +44,7 @@ export default function WishlistsScreen() {
           </Text>
           <TouchableOpacity
             style={styles.exploreBtn}
-            onPress={() => router.push("/(tabs)/" as any)}
+            onPress={() => router.push("/(tabs)/stays" as any)}
           >
             <Text style={styles.exploreBtnText}>Explore Stays</Text>
           </TouchableOpacity>
@@ -48,81 +54,86 @@ export default function WishlistsScreen() {
           data={wishlistItems}
           keyExtractor={(item, index) => item._id || item.id || `wish-${index}`}
           renderItem={({ item }) => <PropertyCard property={item} />}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: bottomPadding }]}
           showsVerticalScrollIndicator={false}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: "#F8F9FA",
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
+    borderBottomColor: "#E5E7EB",
+  },
+  headerTag: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#FF5A1F",
+    letterSpacing: 0.6,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: "800",
-    color: Colors.text,
-    letterSpacing: -0.5,
+    color: "#111827",
+    marginTop: 2,
+    letterSpacing: -0.3,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginTop: 4,
-  },
-  listContent: {
-    paddingTop: 16,
-    paddingBottom: 24,
+    fontSize: 12,
+    color: "#6B7280",
+    marginTop: 2,
   },
   emptyContainer: {
-    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 36,
+    padding: 36,
+    marginTop: 60,
   },
   emptyIconCircle: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: "rgba(255, 56, 92, 0.12)",
+    backgroundColor: "#FFF1F2",
+    borderWidth: 1,
+    borderColor: "#FECDD3",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255, 56, 92, 0.25)",
+    marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "800",
-    color: Colors.text,
-    textAlign: "center",
+    color: "#111827",
   },
   emptySubtitle: {
-    fontSize: 14,
-    color: Colors.textSecondary,
+    fontSize: 13,
+    color: "#6B7280",
     textAlign: "center",
-    marginTop: 8,
-    lineHeight: 22,
+    marginTop: 6,
+    lineHeight: 18,
   },
   exploreBtn: {
-    marginTop: 24,
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 28,
+    marginTop: 20,
+    paddingHorizontal: 22,
+    paddingVertical: 11,
+    borderRadius: 24,
+    backgroundColor: "#FF5A1F",
   },
   exploreBtnText: {
     color: "#FFFFFF",
+    fontSize: 13,
     fontWeight: "700",
-    fontSize: 15,
+  },
+  listContent: {
+    paddingTop: 14,
   },
 });

@@ -12,6 +12,7 @@ import {
   Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -28,6 +29,7 @@ const HERO_HEIGHT = 300;
 
 export default function PropertyDetailScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id, categoryId } = useLocalSearchParams<{ id: string; categoryId?: string }>();
   const { isWishlisted, toggleWishlist } = useWishlist();
 
@@ -138,7 +140,7 @@ export default function PropertyDetailScreen() {
           </ScrollView>
 
           {/* Floating Navigation Controls */}
-          <SafeAreaView style={styles.heroNavRow}>
+          <View style={[styles.heroNavRow, { paddingTop: Math.max(insets.top, 12) }]}>
             <TouchableOpacity style={styles.circleBtn} onPress={() => router.back()}>
               <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
             </TouchableOpacity>
@@ -157,7 +159,7 @@ export default function PropertyDetailScreen() {
                 />
               </TouchableOpacity>
             </View>
-          </SafeAreaView>
+          </View>
 
           {/* Pagination Counter Badge */}
           <View style={styles.counterBadge}>
@@ -508,15 +510,16 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: Colors.card,
+    backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: Platform.OS === "ios" ? 28 : 14,
+    paddingBottom: Platform.OS === "ios" ? 30 : 18,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    elevation: 8,
   },
   bottomPriceBlock: {
     flex: 1,

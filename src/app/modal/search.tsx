@@ -3,13 +3,14 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   TextInput,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { Colors } from "../../theme/colors";
 import { useSearch } from "../../context/SearchContext";
@@ -34,6 +35,7 @@ const PRICE_PRESETS = [
 
 export default function SearchModal() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const {
     destination,
     setDestination,
@@ -58,22 +60,24 @@ export default function SearchModal() {
     setGuests(localGuests);
     const selectedPrice = PRICE_PRESETS[activePriceIdx];
     setPriceRange(selectedPrice.min, selectedPrice.max);
-
     router.back();
   };
 
   const handleReset = () => {
-    setLocalDest("");
-    setLocalGuests(1);
-    setActivePriceIdx(0);
     clearFilters();
+    setLocalDest("");
+    setLocalGuests(2);
+    setActivePriceIdx(0);
   };
 
+  const bottomInset = Math.max(insets.bottom, 12);
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.container, { paddingTop: Math.max(insets.top, 10) }]}>
+      {/* Top Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()}>
-          <Ionicons name="close" size={22} color={Colors.text} />
+          <Ionicons name="close" size={22} color="#111827" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Filters & Search</Text>
         <TouchableOpacity onPress={handleReset}>
@@ -81,22 +85,25 @@ export default function SearchModal() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 + bottomInset }]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Step 1: Where to? */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Where to?</Text>
           <View style={styles.searchInputWrapper}>
-            <Ionicons name="search" size={18} color={Colors.textSecondary} />
+            <Ionicons name="search" size={18} color="#6B7280" />
             <TextInput
               style={styles.searchInput}
               placeholder="Search destination, city, or villa name..."
-              placeholderTextColor={Colors.textTertiary}
+              placeholderTextColor="#9CA3AF"
               value={localDest}
               onChangeText={setLocalDest}
             />
             {localDest ? (
               <TouchableOpacity onPress={() => setLocalDest("")}>
-                <Ionicons name="close-circle" size={18} color={Colors.textTertiary} />
+                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
               </TouchableOpacity>
             ) : null}
           </View>
@@ -110,51 +117,56 @@ export default function SearchModal() {
                 <TouchableOpacity
                   key={dest.name}
                   style={[styles.destItem, isSelected && styles.destItemSelected]}
+                  activeOpacity={0.7}
                   onPress={() => setLocalDest(dest.name)}
                 >
-                  <View style={styles.destIconBox}>
+                  <View style={styles.destIconWrapper}>
                     <Ionicons
-                      name="location"
+                      name="location-sharp"
                       size={18}
-                      color={isSelected ? Colors.primary : Colors.textSecondary}
+                      color={isSelected ? Colors.primary : "#9CA3AF"}
                     />
                   </View>
-                  <View style={styles.destTextBox}>
-                    <Text style={[styles.destName, isSelected && styles.destNameSelected]}>
+                  <View style={styles.destTextWrapper}>
+                    <Text
+                      style={[styles.destName, isSelected && styles.destNameSelected]}
+                    >
                       {dest.name}
                     </Text>
                     <Text style={styles.destTagline}>{dest.tagline}</Text>
                   </View>
-                  {isSelected && (
-                    <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
-                  )}
                 </TouchableOpacity>
               );
             })}
           </View>
         </View>
 
-        {/* Step 2: Who's coming? */}
+        {/* Step 2: Who is coming? */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Who's coming?</Text>
+          <Text style={styles.cardTitle}>Who is coming?</Text>
           <View style={styles.counterRow}>
             <View>
-              <Text style={styles.counterTitle}>Total Guests</Text>
-              <Text style={styles.counterSubtitle}>Adults, children, and friends</Text>
+              <Text style={styles.counterLabel}>Guests</Text>
+              <Text style={styles.counterHint}>Ages 13 or above</Text>
             </View>
-            <View style={styles.stepper}>
+            <View style={styles.counterButtons}>
               <TouchableOpacity
-                style={styles.stepBtn}
-                onPress={() => setLocalGuests(Math.max(1, localGuests - 1))}
+                style={[styles.counterBtn, localGuests <= 1 && styles.counterBtnDisabled]}
+                disabled={localGuests <= 1}
+                onPress={() => setLocalGuests((g) => Math.max(1, g - 1))}
               >
-                <Ionicons name="remove" size={18} color={Colors.text} />
+                <Ionicons
+                  name="remove"
+                  size={18}
+                  color={localGuests <= 1 ? "#D1D5DB" : "#111827"}
+                />
               </TouchableOpacity>
-              <Text style={styles.stepCount}>{localGuests}</Text>
+              <Text style={styles.counterValue}>{localGuests}</Text>
               <TouchableOpacity
-                style={styles.stepBtn}
-                onPress={() => setLocalGuests(localGuests + 1)}
+                style={styles.counterBtn}
+                onPress={() => setLocalGuests((g) => Math.min(30, g + 1))}
               >
-                <Ionicons name="add" size={18} color={Colors.text} />
+                <Ionicons name="add" size={18} color="#111827" />
               </TouchableOpacity>
             </View>
           </View>
@@ -162,111 +174,126 @@ export default function SearchModal() {
 
         {/* Step 3: Price Range */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Price range per night</Text>
-          <View style={styles.priceGrid}>
-            {PRICE_PRESETS.map((preset, idx) => {
-              const isSelected = activePriceIdx === idx;
-              return (
-                <TouchableOpacity
-                  key={preset.label}
-                  style={[styles.priceChip, isSelected && styles.priceChipSelected]}
-                  onPress={() => setActivePriceIdx(idx)}
+          <Text style={styles.cardTitle}>Price per night</Text>
+          <View style={styles.priceChipsGrid}>
+            {PRICE_PRESETS.map((preset, idx) => (
+              <TouchableOpacity
+                key={idx}
+                style={[
+                  styles.priceChip,
+                  activePriceIdx === idx && styles.priceChipSelected,
+                ]}
+                onPress={() => setActivePriceIdx(idx)}
+              >
+                <Text
+                  style={[
+                    styles.priceChipText,
+                    activePriceIdx === idx && styles.priceChipTextSelected,
+                  ]}
                 >
-                  <Text
-                    style={[
-                      styles.priceChipText,
-                      isSelected && styles.priceChipTextSelected,
-                    ]}
-                  >
-                    {preset.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+                  {preset.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
       </ScrollView>
 
-      {/* Apply Button */}
-      <View style={styles.footerBar}>
+      {/* Sticky Bottom Apply Bar */}
+      <View style={[styles.footerBar, { paddingBottom: bottomInset + 8 }]}>
         <TouchableOpacity style={styles.applyBtn} activeOpacity={0.88} onPress={handleApply}>
           <Ionicons name="search" size={18} color="#FFFFFF" />
-          <Text style={styles.applyBtnText}>Show Stays</Text>
+          <Text style={styles.applyBtnText}>Search Stays</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: "#F8F9FA",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 14,
+    backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
+    borderBottomColor: "#E5E7EB",
   },
   closeBtn: {
-    padding: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "700",
-    color: Colors.text,
+    color: "#111827",
   },
   resetText: {
     fontSize: 14,
+    color: Colors.primary,
     fontWeight: "600",
-    color: Colors.textSecondary,
-    textDecorationLine: "underline",
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 100,
     gap: 16,
   },
   card: {
-    backgroundColor: Colors.card,
-    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 18,
     borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 16,
+    borderColor: "#E5E7EB",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   cardTitle: {
     fontSize: 18,
-    fontWeight: "700",
-    color: Colors.text,
-    marginBottom: 12,
+    fontWeight: "800",
+    color: "#111827",
+    marginBottom: 14,
   },
   searchInputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.cardSecondary,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 46,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 48,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: "#E5E7EB",
     gap: 10,
   },
   searchInput: {
     flex: 1,
-    color: Colors.text,
+    color: "#111827",
     fontSize: 14,
   },
   quickPicksTitle: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "800",
-    color: Colors.textTertiary,
+    color: "#9CA3AF",
     letterSpacing: 0.8,
     marginTop: 18,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   destList: {
     gap: 8,
@@ -274,39 +301,41 @@ const styles = StyleSheet.create({
   destItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 10,
+    padding: 10,
     borderRadius: 12,
+    backgroundColor: "#F9FAFB",
     borderWidth: 1,
-    borderColor: "transparent",
+    borderColor: "#E5E7EB",
   },
   destItemSelected: {
-    backgroundColor: "rgba(255, 90, 31, 0.08)",
-    borderColor: "rgba(255, 90, 31, 0.3)",
+    backgroundColor: "#FFF7ED",
+    borderColor: Colors.primary,
   },
-  destIconBox: {
+  destIconWrapper: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.cardSecondary,
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
   },
-  destTextBox: {
+  destTextWrapper: {
     flex: 1,
   },
   destName: {
     fontSize: 14,
     fontWeight: "700",
-    color: Colors.text,
+    color: "#111827",
   },
   destNameSelected: {
     color: Colors.primary,
   },
   destTagline: {
-    fontSize: 12,
-    color: Colors.textSecondary,
+    fontSize: 11,
+    color: "#6B7280",
     marginTop: 1,
   },
   counterRow: {
@@ -314,58 +343,62 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  counterTitle: {
+  counterLabel: {
     fontSize: 15,
-    fontWeight: "600",
-    color: Colors.text,
+    fontWeight: "700",
+    color: "#111827",
   },
-  counterSubtitle: {
+  counterHint: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: "#6B7280",
     marginTop: 2,
   },
-  stepper: {
+  counterButtons: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
   },
-  stepBtn: {
+  counterBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: "#D1D5DB",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: Colors.cardSecondary,
+    backgroundColor: "#FFFFFF",
   },
-  stepCount: {
+  counterBtnDisabled: {
+    borderColor: "#E5E7EB",
+    backgroundColor: "#F3F4F6",
+  },
+  counterValue: {
     fontSize: 16,
     fontWeight: "700",
-    color: Colors.text,
+    color: "#111827",
     minWidth: 20,
     textAlign: "center",
   },
-  priceGrid: {
+  priceChipsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
   },
   priceChip: {
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 9,
     borderRadius: 14,
-    backgroundColor: Colors.cardSecondary,
+    backgroundColor: "#F3F4F6",
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: "#E5E7EB",
   },
   priceChipSelected: {
-    backgroundColor: "rgba(255, 90, 31, 0.15)",
+    backgroundColor: "#FFF7ED",
     borderColor: Colors.primary,
   },
   priceChipText: {
-    fontSize: 13,
-    color: Colors.textSecondary,
+    fontSize: 12,
+    color: "#4B5563",
     fontWeight: "600",
   },
   priceChipTextSelected: {
@@ -377,12 +410,20 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: Colors.card,
+    backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: "#E5E7EB",
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 24,
+    elevation: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: -3 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+      },
+    }),
   },
   applyBtn: {
     flexDirection: "row",
@@ -390,12 +431,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     backgroundColor: Colors.primary,
-    paddingVertical: 14,
+    paddingVertical: 13,
     borderRadius: 26,
   },
   applyBtnText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
   },
 });

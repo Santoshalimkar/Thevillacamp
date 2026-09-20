@@ -3,18 +3,19 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Linking,
-  Image,
   Alert,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../theme/colors";
 import { useAuth } from "../../context/AuthContext";
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const { user, isAuthenticated, openAuthModal, logout } = useAuth();
 
   const handleOpenWhatsApp = () => {
@@ -42,14 +43,22 @@ export default function ProfileScreen() {
     );
   };
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profile</Text>
-        </View>
+  const bottomPadding = Math.max(insets.bottom, 10) + 80;
 
+  return (
+    <View style={[styles.container, { paddingTop: Math.max(insets.top, 10) }]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTag}>ACCOUNT & SETTINGS</Text>
+        <Text style={styles.headerTitle}>
+          My <Text style={{ color: Colors.primary }}>Profile</Text>
+        </Text>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPadding }]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* User Card */}
         {isAuthenticated && user ? (
           <View style={styles.userCard}>
@@ -59,254 +68,308 @@ export default function ProfileScreen() {
               </Text>
             </View>
             <View style={styles.userInfo}>
-              <Text style={styles.userName}>
-                {user.name || `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Valued Guest"}
-              </Text>
-              <Text style={styles.userPhone}>+91 {user.phone}</Text>
-              {user.email && <Text style={styles.userEmail}>{user.email}</Text>}
+              <Text style={styles.userName}>{user.name || "Valued Guest"}</Text>
+              <Text style={styles.userPhone}>+91 {user.mobileNumber || user.phone}</Text>
+              <View style={styles.verifiedBadge}>
+                <Ionicons name="shield-checkmark" size={12} color="#10B981" />
+                <Text style={styles.verifiedText}>Verified Account</Text>
+              </View>
             </View>
           </View>
         ) : (
-          <TouchableOpacity style={styles.loginBanner} activeOpacity={0.88} onPress={openAuthModal}>
-            <View style={styles.loginBannerLeft}>
-              <View style={styles.whatsappLogoCircle}>
-                <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
-              </View>
-              <View>
-                <Text style={styles.loginBannerTitle}>Log In with WhatsApp</Text>
-                <Text style={styles.loginBannerSubtitle}>Instant OTP • No password required</Text>
-              </View>
+          <View style={styles.loginBanner}>
+            <View style={styles.loginBannerContent}>
+              <Text style={styles.loginBannerTitle}>Log in to manage your stays</Text>
+              <Text style={styles.loginBannerSubtitle}>
+                Access WhatsApp instant check-in, saved wishlists, and customized perks.
+              </Text>
+              <TouchableOpacity
+                activeOpacity={0.88}
+                style={styles.loginBtn}
+                onPress={openAuthModal}
+              >
+                <Ionicons name="logo-whatsapp" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={styles.loginBtnText}>Log In with WhatsApp</Text>
+              </TouchableOpacity>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-          </TouchableOpacity>
+          </View>
         )}
 
         {/* Host Banner */}
         <TouchableOpacity
-          style={styles.hostBanner}
           activeOpacity={0.88}
+          style={styles.hostBanner}
           onPress={handleListProperty}
         >
           <View style={styles.hostBannerText}>
-            <Text style={styles.hostBannerTitle}>Host your villa or camp</Text>
+            <View style={styles.hostBadge}>
+              <Text style={styles.hostBadgeText}>PARTNER WITH US</Text>
+            </View>
+            <Text style={styles.hostBannerTitle}>List your villa or campsite</Text>
             <Text style={styles.hostBannerSubtitle}>
-              Earn top revenue with zero hassle. Join 200+ partner hosts across Maharashtra.
+              Earn verified bookings from thousands of high-intent travelers across Maharashtra.
             </Text>
           </View>
-          <Ionicons name="home-outline" size={28} color={Colors.primary} />
+          <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
         </TouchableOpacity>
 
-        {/* Menu Section */}
+        {/* Menu Section 1: Support & AI */}
         <View style={styles.section}>
           <Text style={styles.sectionHeader}>SUPPORT & ASSISTANCE</Text>
-
-          <TouchableOpacity style={styles.menuItem} onPress={handleOpenWhatsApp}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleOpenWhatsApp}
+            activeOpacity={0.7}
+          >
             <View style={styles.menuLeft}>
-              <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
-              <Text style={styles.menuTitle}>24/7 WhatsApp Concierge</Text>
+              <View style={[styles.menuIconCircle, { backgroundColor: "#F0FDF4" }]}>
+                <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
+              </View>
+              <Text style={styles.menuTitle}>24/7 WhatsApp Hotline</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() =>
-              Linking.openURL("https://thevillacamp.com/contact")
-            }
+            onPress={() => Linking.openURL("tel:919820000000")}
+            activeOpacity={0.7}
           >
             <View style={styles.menuLeft}>
-              <Ionicons name="call-outline" size={20} color={Colors.textSecondary} />
-              <Text style={styles.menuTitle}>Contact Support Desk</Text>
+              <View style={[styles.menuIconCircle, { backgroundColor: "#EFF6FF" }]}>
+                <Ionicons name="call-outline" size={18} color="#3B82F6" />
+              </View>
+              <Text style={styles.menuTitle}>Direct Concierge Call</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
           </TouchableOpacity>
         </View>
 
+        {/* Menu Section 2: Legal & About */}
         <View style={styles.section}>
-          <Text style={styles.sectionHeader}>LEGAL & POLICIES</Text>
-
+          <Text style={styles.sectionHeader}>ABOUT THE VILLA & CAMP</Text>
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() =>
-              Linking.openURL("https://thevillacamp.com/terms-of-service")
-            }
+            onPress={() => Linking.openURL("https://thevillacamp.com/terms")}
+            activeOpacity={0.7}
           >
             <View style={styles.menuLeft}>
-              <Ionicons name="document-text-outline" size={20} color={Colors.textSecondary} />
+              <View style={[styles.menuIconCircle, { backgroundColor: "#F9FAFB" }]}>
+                <Ionicons name="document-text-outline" size={18} color="#4B5563" />
+              </View>
               <Text style={styles.menuTitle}>Terms of Service</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() =>
-              Linking.openURL("https://thevillacamp.com/privacy-policy")
-            }
+            onPress={() => Linking.openURL("https://thevillacamp.com/privacy")}
+            activeOpacity={0.7}
           >
             <View style={styles.menuLeft}>
-              <Ionicons name="shield-checkmark-outline" size={20} color={Colors.textSecondary} />
+              <View style={[styles.menuIconCircle, { backgroundColor: "#F9FAFB" }]}>
+                <Ionicons name="shield-outline" size={18} color="#4B5563" />
+              </View>
               <Text style={styles.menuTitle}>Privacy Policy</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
           </TouchableOpacity>
         </View>
 
-        {/* Logout */}
+        {/* Logout Button */}
         {isAuthenticated && (
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleConfirmLogout}>
-            <Ionicons name="log-out-outline" size={20} color={Colors.error} />
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={styles.logoutBtn}
+            onPress={handleConfirmLogout}
+          >
+            <Ionicons name="log-out-outline" size={18} color="#EF4444" />
             <Text style={styles.logoutBtnText}>Log Out</Text>
           </TouchableOpacity>
         )}
 
-        {/* App Version Info */}
+        {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerBrand}>THE VILLA & CAMP</Text>
-          <Text style={styles.footerVersion}>Version 1.0.0 (Expo SDK 57)</Text>
+          <Text style={styles.footerVersion}>Version 1.0.0 • Verified Stays</Text>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: Colors.background,
-  },
-  scrollContent: {
-    paddingBottom: 40,
+    backgroundColor: "#F8F9FA",
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  headerTag: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#FF5A1F",
+    letterSpacing: 0.6,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: "800",
-    color: Colors.text,
-    letterSpacing: -0.5,
+    color: "#111827",
+    marginTop: 2,
+    letterSpacing: -0.3,
+  },
+  scrollContent: {
+    paddingTop: 16,
   },
   userCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.card,
+    backgroundColor: "#FFFFFF",
     marginHorizontal: 16,
     padding: 16,
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: "#E5E7EB",
     marginBottom: 16,
   },
   avatarCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.primary,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#FFF7ED",
+    borderWidth: 1.5,
+    borderColor: "#FF5A1F",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 16,
+    marginRight: 14,
   },
   avatarInitials: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: "#FF5A1F",
   },
   userInfo: {
     flex: 1,
   },
   userName: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: Colors.text,
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#111827",
   },
   userPhone: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: "#6B7280",
     marginTop: 2,
   },
-  userEmail: {
-    fontSize: 12,
-    color: Colors.textTertiary,
-    marginTop: 2,
+  verifiedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+  },
+  verifiedText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#10B981",
   },
   loginBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: Colors.card,
+    backgroundColor: "#FFFFFF",
     marginHorizontal: 16,
-    padding: 16,
-    borderRadius: 18,
+    padding: 20,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: "#E5E7EB",
     marginBottom: 16,
   },
-  loginBannerLeft: {
-    flexDirection: "row",
+  loginBannerContent: {
     alignItems: "center",
-    gap: 14,
-  },
-  whatsappLogoCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(37, 211, 102, 0.12)",
-    alignItems: "center",
-    justifyContent: "center",
   },
   loginBannerTitle: {
     fontSize: 16,
-    fontWeight: "700",
-    color: Colors.text,
+    fontWeight: "800",
+    color: "#111827",
   },
   loginBannerSubtitle: {
     fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 2,
+    color: "#6B7280",
+    textAlign: "center",
+    marginTop: 6,
+    lineHeight: 17,
+  },
+  loginBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#25D366",
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    borderRadius: 24,
+    marginTop: 16,
+  },
+  loginBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
   },
   hostBanner: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: Colors.cardSecondary,
+    backgroundColor: "#FFFFFF",
     marginHorizontal: 16,
-    padding: 18,
-    borderRadius: 18,
+    padding: 16,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 24,
+    borderColor: "#E5E7EB",
+    marginBottom: 16,
   },
   hostBannerText: {
     flex: 1,
     marginRight: 12,
   },
+  hostBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "#FFF7ED",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 6,
+  },
+  hostBadgeText: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: "#EA580C",
+    letterSpacing: 0.5,
+  },
   hostBannerTitle: {
     fontSize: 15,
-    fontWeight: "700",
-    color: Colors.text,
+    fontWeight: "800",
+    color: "#111827",
   },
   hostBannerSubtitle: {
     fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 4,
-    lineHeight: 18,
+    color: "#6B7280",
+    marginTop: 3,
+    lineHeight: 17,
   },
   section: {
+    backgroundColor: "#FFFFFF",
     marginHorizontal: 16,
-    marginBottom: 20,
-    backgroundColor: Colors.card,
-    borderRadius: 18,
+    marginBottom: 16,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: "#E5E7EB",
     overflow: "hidden",
   },
   sectionHeader: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "800",
-    color: Colors.textTertiary,
+    color: "#9CA3AF",
     letterSpacing: 0.8,
     paddingHorizontal: 16,
     paddingTop: 14,
@@ -317,51 +380,58 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 13,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
+    borderBottomColor: "#F3F4F6",
   },
   menuLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 12,
+  },
+  menuIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
   },
   menuTitle: {
     fontSize: 14,
     fontWeight: "600",
-    color: Colors.text,
+    color: "#111827",
   },
   logoutBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 6,
     marginHorizontal: 16,
-    marginTop: 8,
-    paddingVertical: 14,
+    marginTop: 4,
+    paddingVertical: 13,
     borderRadius: 16,
-    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    backgroundColor: "#FEF2F2",
     borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.25)",
+    borderColor: "#FECACA",
   },
   logoutBtnText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
-    color: Colors.error,
+    color: "#EF4444",
   },
   footer: {
     alignItems: "center",
-    marginTop: 32,
+    marginTop: 26,
   },
   footerBrand: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "800",
     letterSpacing: 1.5,
-    color: Colors.textTertiary,
+    color: "#9CA3AF",
   },
   footerVersion: {
     fontSize: 11,
-    color: Colors.textTertiary,
-    marginTop: 4,
+    color: "#9CA3AF",
+    marginTop: 3,
   },
 });

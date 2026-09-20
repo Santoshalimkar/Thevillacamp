@@ -14,7 +14,7 @@ export default function RootLayout() {
       <AuthProvider>
         <WishlistProvider>
           <SearchProvider>
-            <StatusBar style="light" />
+            <StatusBar style="dark" />
             <Stack
               screenOptions={{
                 headerShown: false,

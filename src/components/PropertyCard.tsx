@@ -8,7 +8,7 @@ import {
   FlatList,
   NativeSyntheticEvent,
   NativeScrollEvent,
-  Image as RNImage,
+  Platform,
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,8 +19,8 @@ import { PropertyItem } from "../services/propertyService";
 import { useWishlist } from "../context/WishlistContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const CARD_WIDTH = SCREEN_WIDTH - 32;
-const CARD_HEIGHT = 260;
+const CARD_WIDTH = SCREEN_WIDTH - 28;
+const CARD_HEIGHT = 240;
 
 interface PropertyCardProps {
   property: PropertyItem;
@@ -87,11 +87,11 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
 
   return (
     <TouchableOpacity
-      activeOpacity={0.92}
+      activeOpacity={0.93}
       onPress={handlePressCard}
       style={styles.cardContainer}
     >
-      {/* Photo Carousel */}
+      {/* Photo Carousel Container */}
       <View style={styles.imageContainer}>
         <FlatList
           data={photos}
@@ -111,70 +111,71 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
           )}
         />
 
-        {/* Top Badges */}
+        {/* Top Badges Row */}
         <View style={styles.topRow}>
-          {property.featured ? (
+          {property.isFeatured ? (
             <View style={styles.featuredBadge}>
-              <Text style={styles.featuredText}>EXCLUSIVE</Text>
+              <Text style={styles.featuredText}>POPULAR</Text>
             </View>
           ) : (
             <View style={styles.superhostBadge}>
-              <Text style={styles.superhostText}>VERIFIED STAY</Text>
+              <Text style={styles.superhostText}>VERIFIED</Text>
             </View>
           )}
 
-          {/* Wishlist Button */}
+          {/* Heart Wishlist Button */}
           <TouchableOpacity
             style={styles.heartButton}
-            activeOpacity={0.8}
             onPress={handlePressHeart}
+            activeOpacity={0.8}
           >
             <Ionicons
               name={wishlisted ? "heart" : "heart-outline"}
-              size={22}
+              size={20}
               color={wishlisted ? Colors.heartRed : "#FFFFFF"}
             />
           </TouchableOpacity>
         </View>
 
-        {/* Carousel Pagination Dots */}
+        {/* Pagination Dots */}
         {photos.length > 1 && (
           <View style={styles.paginationDots}>
-            {photos.slice(0, 6).map((_, i) => (
+            {photos.slice(0, 5).map((_, idx) => (
               <View
-                key={i}
-                style={[
-                  styles.dot,
-                  i === activeImageIndex && styles.dotActive,
-                ]}
+                key={`dot-${idx}`}
+                style={[styles.dot, activeImageIndex === idx && styles.dotActive]}
               />
             ))}
           </View>
         )}
       </View>
 
-      {/* Info Section */}
+      {/* Property Details Container */}
       <View style={styles.infoContainer}>
-        {/* Title and Rating */}
+        {/* Header Title & Rating */}
         <View style={styles.headerRow}>
           <Text style={styles.title} numberOfLines={1}>
-            {property.name || property.title || "The Villa Camp Haven"}
+            {property.title || property.propertyName || "Luxury Private Villa"}
           </Text>
           <View style={styles.ratingBox}>
             <Ionicons name="star" size={14} color={Colors.ratingGold} />
-            <Text style={styles.ratingText}>{ratingVal}</Text>
+            <Text style={styles.ratingText}>
+              {ratingVal}
+              <Text style={styles.ratingCount}> ({reviewsCount})</Text>
+            </Text>
           </View>
         </View>
 
-        {/* Location / Tagline */}
+        {/* Location & Specs */}
         <Text style={styles.location} numberOfLines={1}>
-          {locationText} • {property.bhkType ? `${property.bhkType} • ` : ""}
-          {property.maxGuests || 8} Guests
+          {locationText} • {property.maxGuests || 8} Guests • {property.bedrooms || 3} BHK
         </Text>
 
-        {/* Price Row */}
+        {/* Pricing Row */}
         <View style={styles.priceRow}>
-          <Text style={styles.priceAmount}>₹{price.toLocaleString("en-IN")}</Text>
+          <Text style={styles.priceAmount}>
+            ₹{price.toLocaleString("en-IN")}
+          </Text>
           <Text style={styles.priceUnit}> / night</Text>
           <Text style={styles.taxesText}>+ taxes</Text>
         </View>
@@ -185,92 +186,106 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
 
 const styles = StyleSheet.create({
   cardContainer: {
-    marginHorizontal: 16,
-    marginBottom: 26,
+    marginHorizontal: 14,
+    marginBottom: 20,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   imageContainer: {
-    width: CARD_WIDTH,
+    width: "100%",
     height: CARD_HEIGHT,
-    borderRadius: 18,
+    borderRadius: 16,
     overflow: "hidden",
     position: "relative",
-    backgroundColor: Colors.cardSecondary,
+    backgroundColor: "#F3F4F6",
   },
   cardImage: {
-    width: CARD_WIDTH,
+    width: CARD_WIDTH - 20,
     height: CARD_HEIGHT,
   },
   topRow: {
     position: "absolute",
-    top: 12,
-    left: 12,
-    right: 12,
+    top: 10,
+    left: 10,
+    right: 10,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
   featuredBadge: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    backgroundColor: "#FF5A1F",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   featuredText: {
     color: "#FFFFFF",
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "800",
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
   },
   superhostBadge: {
-    backgroundColor: "rgba(18, 19, 23, 0.75)",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    backgroundColor: "rgba(17, 24, 39, 0.75)",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 6,
     borderWidth: 0.5,
-    borderColor: "rgba(255, 255, 255, 0.2)",
+    borderColor: "rgba(255, 255, 255, 0.25)",
   },
   superhostText: {
     color: "#FFFFFF",
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "700",
     letterSpacing: 0.5,
   },
   heartButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(10, 11, 14, 0.55)",
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(17, 24, 39, 0.5)",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
   },
   paginationDots: {
     position: "absolute",
-    bottom: 12,
+    bottom: 10,
     left: 0,
     right: 0,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 5,
+    gap: 4,
   },
   dot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "rgba(255, 255, 255, 0.4)",
+    backgroundColor: "rgba(255, 255, 255, 0.5)",
   },
   dotActive: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 16,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: "#FFFFFF",
   },
   infoContainer: {
-    marginTop: 10,
+    paddingHorizontal: 4,
+    paddingTop: 10,
+    paddingBottom: 2,
   },
   headerRow: {
     flexDirection: "row",
@@ -281,24 +296,30 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: "700",
-    color: Colors.text,
+    color: "#111827",
     letterSpacing: -0.2,
     marginRight: 8,
   },
   ratingBox: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 3,
   },
   ratingText: {
     fontSize: 13,
     fontWeight: "700",
-    color: Colors.text,
+    color: "#111827",
+  },
+  ratingCount: {
+    fontWeight: "500",
+    color: "#6B7280",
+    fontSize: 11,
   },
   location: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 3,
+    fontSize: 12,
+    color: "#4B5563",
+    marginTop: 4,
+    fontWeight: "500",
   },
   priceRow: {
     flexDirection: "row",
@@ -308,17 +329,17 @@ const styles = StyleSheet.create({
   priceAmount: {
     fontSize: 16,
     fontWeight: "800",
-    color: Colors.text,
+    color: "#111827",
     letterSpacing: -0.3,
   },
   priceUnit: {
-    fontSize: 14,
-    color: Colors.textSecondary,
+    fontSize: 13,
+    color: "#6B7280",
     fontWeight: "500",
   },
   taxesText: {
-    fontSize: 12,
-    color: Colors.textTertiary,
+    fontSize: 11,
+    color: "#9CA3AF",
     marginLeft: 6,
   },
 });

@@ -8,6 +8,7 @@ export interface UserProfile {
   lastName?: string;
   email?: string;
   phone: string;
+  mobileNumber?: string;
   role?: string;
   avatar?: string;
 }
