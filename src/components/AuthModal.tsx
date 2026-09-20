@@ -13,8 +13,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { Colors } from "../../theme/colors";
-import { useAuth } from "../../context/AuthContext";
+import { Colors } from "../theme/colors";
+import { useAuth } from "../context/AuthContext";
 
 export const AuthModal: React.FC = () => {
   const { isAuthModalOpen, closeAuthModal, requestOtp, verifyOtp } = useAuth();
@@ -214,6 +214,8 @@ export const AuthModal: React.FC = () => {
   );
 };
 
+export default AuthModal;
+
 const styles = StyleSheet.create({
   modalBackdrop: {
     flex: 1,
@@ -344,5 +346,3 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
 });
-
-export default AuthModal;

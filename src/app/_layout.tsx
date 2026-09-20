@@ -5,7 +5,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider } from "../context/AuthContext";
 import { WishlistProvider } from "../context/WishlistContext";
 import { SearchProvider } from "../context/SearchContext";
-import { AuthModal } from "./modal/auth";
+import { AuthModal } from "../components/AuthModal";
 import { Colors } from "../theme/colors";
 
 export default function RootLayout() {
