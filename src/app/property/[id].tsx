@@ -9,11 +9,11 @@ import {
   ActivityIndicator,
   Share,
   Platform,
-  Alert,
+  Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
-import { Ionicons, MaterialCommunityIcons, FontAwesome6 } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
@@ -36,6 +36,82 @@ const DETAIL_TABS = [
   { id: "location", label: "Location" },
 ];
 
+const SIGNATURE_EXPERIENCES = [
+  {
+    title: "FULLY-SERVICED",
+    subtitle: "VILLAS",
+    image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80",
+  },
+  {
+    title: "CURATED",
+    subtitle: "DINING",
+    image: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80",
+  },
+  {
+    title: "SCENIC",
+    subtitle: "PANORAMA",
+    image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80",
+  },
+];
+
+const SAMPLE_HIGHLIGHTS = [
+  {
+    title: "Peaceful natural stay",
+    description: "Enjoye morning/evening walks and a calm environment surrounded by nature.",
+    image: "https://images.unsplash.com/photo-1510798831971-661eb04b3739?w=600&q=80",
+  },
+  {
+    title: "Ideal for group party",
+    description: "Enjoy your celebration party with modern amenities and private pool",
+    image: "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=600&q=80",
+  },
+];
+
+const SAMPLE_SPACES = [
+  {
+    name: "Outdoor",
+    category: "Outdoor & Nature",
+    description: "Stunning natutre view from terrace",
+    image: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&q=80",
+    features: ["Open-Air Setting", "Scenic Views", "Relaxation Seating"],
+  },
+  {
+    name: "Private Pool & Deck",
+    category: "Pool & Deck",
+    description: "Private swimming pool with sun loungers and music setup",
+    image: "https://images.unsplash.com/photo-1576013551627-0cc20b96c2a7?w=800&q=80",
+    features: ["Private Swimming Pool", "Sun Deck", "Evening Lighting"],
+  },
+  {
+    name: "Master Suite",
+    category: "Bedrooms & Suites",
+    description: "Spacious AC bedroom with king size bed and ensuite bathroom",
+    image: "https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800&q=80",
+    features: ["Air Conditioned", "Attached Ensuite Bath", "Plush Linens"],
+  },
+];
+
+const SAMPLE_REVIEWS = [
+  {
+    id: "r1",
+    name: "Aman Sharma",
+    avatar: "A",
+    rating: 5,
+    date: "2 weeks ago",
+    comment:
+      "Exceptional property! The swimming pool and mountain views were unbelievable. The in-house caretaker was extremely helpful and made sure our family stay was seamless.",
+  },
+  {
+    id: "r2",
+    name: "Pooja Mehta",
+    avatar: "P",
+    rating: 5,
+    date: "1 month ago",
+    comment:
+      "Perfect weekend gateway for our group of 8. The barbecue night and sound system were great. Very clean and spacious rooms.",
+  },
+];
+
 export default function PropertyDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -46,6 +122,16 @@ export default function PropertyDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
   const [activeTab, setActiveTab] = useState("highlights");
+  const [isReadMore, setIsReadMore] = useState(false);
+  const [spaceCurrentIndex, setSpaceCurrentIndex] = useState(0);
+
+  // Modals
+  const [isBrochureOpen, setIsBrochureOpen] = useState(false);
+  const [isFaqOpen, setIsFaqOpen] = useState(false);
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+
+  const scrollRef = useRef<ScrollView>(null);
+  const sectionYPositions = useRef<{ [key: string]: number }>({});
 
   const propId = property?._id || property?.id;
   const wishlisted = propId ? isWishlisted(propId) : false;
@@ -86,12 +172,12 @@ export default function PropertyDetailScreen() {
     } as any);
   };
 
-  const handleViewBrochure = () => {
-    Alert.alert(
-      "Digital Brochure",
-      `The luxury brochure for ${property?.name || "this property"} is ready. You will receive it via WhatsApp and email on reservation.`,
-      [{ text: "OK" }]
-    );
+  const handleTabPress = (tabId: string) => {
+    setActiveTab(tabId);
+    const targetY = sectionYPositions.current[tabId];
+    if (targetY !== undefined && scrollRef.current) {
+      scrollRef.current.scrollTo({ y: targetY - 40, animated: true });
+    }
   };
 
   if (loading) {
@@ -139,13 +225,15 @@ export default function PropertyDetailScreen() {
   const maxGuests = property.maxCapacity || property.maxGuests || 8;
   const roomsCount = property.rooms || property.bedrooms || 2;
   const bathsCount = property.baths != null ? property.baths : 2;
-  const ratingScore = property.averageRating || property.rating || 5.0;
-  const reviewsCount = property.totalReviews || property.reviewCount || 1;
+
+  const defaultDescription =
+    `A serene getaway in ${addressLine}, ${cityName} with private swimming pool, garden area, and modern amenities. Ideal for families and groups, offering a peaceful nature-centric stay with homely food and dedicated concierge service.`;
+  const descriptionText = property.description || defaultDescription;
 
   return (
     <View style={styles.screenContainer}>
       {/* ========================================================================= */}
-      {/* 1. TOP HEADER (Matching VillaHeader.js from Screenshot 2)                 */}
+      {/* 1. TOP HEADER (Matching VillaHeader.js)                                   */}
       {/* ========================================================================= */}
       <View style={[styles.topHeader, { paddingTop: Math.max(insets.top, 10) }]}>
         <View style={styles.headerLeft}>
@@ -201,11 +289,15 @@ export default function PropertyDetailScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 10) + 90 }]}
+        ref={scrollRef}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, 12) + 95 },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* ========================================================================= */}
-        {/* 2. HERO CAROUSEL (Matching VillaHero.js from Screenshot 2)                */}
+        {/* 2. HERO CAROUSEL (Matching VillaHero.js)                                  */}
         {/* ========================================================================= */}
         <View style={styles.heroContainer}>
           <ScrollView
@@ -278,7 +370,7 @@ export default function PropertyDetailScreen() {
         </View>
 
         {/* ========================================================================= */}
-        {/* 3. DETAILS & BROCHURE SECTION (Matching VillaDetails.js Screenshot 2)     */}
+        {/* 3. DETAILS & BROCHURE SECTION (Matching VillaDetails.js)                  */}
         {/* ========================================================================= */}
         <View style={styles.detailsContainer}>
           {/* Title & View Brochure Button */}
@@ -295,7 +387,7 @@ export default function PropertyDetailScreen() {
             <TouchableOpacity
               style={styles.brochureButton}
               activeOpacity={0.8}
-              onPress={handleViewBrochure}
+              onPress={() => setIsBrochureOpen(true)}
             >
               <Ionicons name="document-text-outline" size={14} color="#FF5A1F" style={{ marginRight: 4 }} />
               <Text style={styles.brochureText}>View Brochure</Text>
@@ -310,12 +402,12 @@ export default function PropertyDetailScreen() {
 
             <View style={styles.starScoreRow}>
               <Ionicons name="star" size={15} color="#F59E0B" style={{ marginRight: 3 }} />
-              <Text style={styles.starScoreText}>{ratingScore}</Text>
+              <Text style={styles.starScoreText}>5</Text>
               <Text style={styles.starOutOfText}> / 5</Text>
             </View>
 
-            <TouchableOpacity activeOpacity={0.7} onPress={() => setActiveTab("reviews")}>
-              <Text style={styles.reviewsLink}>{reviewsCount} Reviews</Text>
+            <TouchableOpacity activeOpacity={0.7} onPress={() => handleTabPress("reviews")}>
+              <Text style={styles.reviewsLink}>1 Reviews</Text>
             </TouchableOpacity>
           </View>
 
@@ -386,7 +478,7 @@ export default function PropertyDetailScreen() {
         </View>
 
         {/* ========================================================================= */}
-        {/* 4. HORIZONTAL STICKY TABS (Matching StickyTabs.js from Screenshot 2)       */}
+        {/* 4. HORIZONTAL STICKY TABS                                                 */}
         {/* ========================================================================= */}
         <View style={styles.tabsBar}>
           <ScrollView
@@ -401,7 +493,7 @@ export default function PropertyDetailScreen() {
                   <TouchableOpacity
                     key={tab.id}
                     style={styles.liveEventTab}
-                    onPress={() => setActiveTab(tab.id)}
+                    onPress={() => handleTabPress(tab.id)}
                     activeOpacity={0.8}
                   >
                     <View style={styles.livePulseDot} />
@@ -417,7 +509,7 @@ export default function PropertyDetailScreen() {
                 <TouchableOpacity
                   key={tab.id}
                   style={[styles.standardTab, isSelected && styles.standardTabSelected]}
-                  onPress={() => setActiveTab(tab.id)}
+                  onPress={() => handleTabPress(tab.id)}
                   activeOpacity={0.75}
                 >
                   <Text style={[styles.tabText, isSelected && styles.tabTextSelected]}>
@@ -430,44 +522,367 @@ export default function PropertyDetailScreen() {
         </View>
 
         {/* ========================================================================= */}
-        {/* 5. TAB CONTENT SECTIONS (Matching AllTabsContent.js from villa-web)       */}
+        {/* 5. HIGHLIGHTS & VILLACAMP EXPERIENCE (Screenshot 1 & 2)                  */}
         {/* ========================================================================= */}
-        <View style={styles.tabContentContainer}>
-          {/* Title Header with Vertical Orange Bar */}
-          <View style={styles.experienceHeader}>
+        <View
+          onLayout={(e) => (sectionYPositions.current["highlights"] = e.nativeEvent.layout.y)}
+          style={styles.sectionContainer}
+        >
+          {/* Experience Title */}
+          <View style={styles.sectionHeaderRow}>
             <View style={styles.orangeBar} />
-            <Text style={styles.experienceTitle}>The Villacamp Experience</Text>
+            <Text style={styles.sectionHeading}>The Villacamp Experience</Text>
           </View>
 
-          <Text style={styles.experienceBody}>
-            {property.description ||
-              "Indulge in secluded luxury with panoramic valley views, private crystal swimming pool, plush living areas, private lush lawn, and 24/7 personalized concierge service with in-house chef options."}
+          {/* Signature Experience Horizontal Cards */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.signatureCardsScroll}
+          >
+            {SIGNATURE_EXPERIENCES.map((exp, idx) => (
+              <View key={idx} style={styles.signatureCard}>
+                <Image
+                  source={{ uri: exp.image }}
+                  style={styles.signatureCardImage}
+                  contentFit="cover"
+                />
+                <LinearGradient
+                  colors={["transparent", "rgba(0,0,0,0.85)"]}
+                  style={styles.signatureGradient}
+                >
+                  <Text style={styles.signatureTitle}>{exp.title}</Text>
+                  <Text style={styles.signatureSub}>{exp.subtitle}</Text>
+                </LinearGradient>
+              </View>
+            ))}
+          </ScrollView>
+
+          {/* Special Villa Highlights */}
+          <View style={styles.subSectionHeader}>
+            <Ionicons name="sparkles" size={16} color="#FF5A1F" style={{ marginRight: 6 }} />
+            <Text style={styles.subSectionTitle}>Special Villa Highlights</Text>
+          </View>
+
+          <View style={styles.highlightsList}>
+            {SAMPLE_HIGHLIGHTS.map((item, idx) => (
+              <View key={idx} style={styles.highlightCard}>
+                <Image
+                  source={{ uri: item.image }}
+                  style={styles.highlightThumb}
+                  contentFit="cover"
+                />
+                <View style={styles.highlightInfo}>
+                  <Text style={styles.highlightTitle}>{item.title}</Text>
+                  <Text style={styles.highlightDesc}>{item.description}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+
+          {/* Property Description Block */}
+          <View style={[styles.sectionHeaderRow, { marginTop: 18 }]}>
+            <View style={styles.orangeBar} />
+            <Text style={styles.sectionHeading}>{property.name || "Vastalya Villa"}</Text>
+          </View>
+
+          <Text style={styles.descriptionParagraph}>
+            {isReadMore ? descriptionText : `${descriptionText.slice(0, 195)}...`}
           </Text>
 
-          {/* Highlights Features List */}
-          <View style={styles.featureHighlights}>
-            <View style={styles.featureItem}>
-              <Ionicons name="sparkles-sharp" size={16} color="#FF5A1F" style={{ marginRight: 8 }} />
-              <Text style={styles.featureItemText}>100% Verified Private Property</Text>
+          <TouchableOpacity
+            onPress={() => setIsReadMore(!isReadMore)}
+            activeOpacity={0.7}
+            style={{ marginBottom: 12 }}
+          >
+            <Text style={styles.readMoreText}>{isReadMore ? "Read Less" : "Read More"}</Text>
+          </TouchableOpacity>
+
+          {/* Great For Tag Chips */}
+          <View style={styles.tagChipsRow}>
+            <View style={styles.orangeTagChip}>
+              <Text style={styles.orangeTagText}>✦ Ideal for Families</Text>
             </View>
-            <View style={styles.featureItem}>
-              <Ionicons name="shield-checkmark" size={16} color="#FF5A1F" style={{ marginRight: 8 }} />
-              <Text style={styles.featureItemText}>Caretaker & Housekeeping On-Site</Text>
+            <View style={styles.orangeTagChip}>
+              <Text style={styles.orangeTagText}>✦ Ideal for Groups</Text>
             </View>
-            <View style={styles.featureItem}>
-              <Ionicons name="wifi" size={16} color="#FF5A1F" style={{ marginRight: 8 }} />
-              <Text style={styles.featureItemText}>Ultra-Fast High Speed Optical Wi-Fi</Text>
+            <View style={styles.orangeTagChip}>
+              <Text style={styles.orangeTagText}>✦ Pet-Friendly</Text>
             </View>
-            <View style={styles.featureItem}>
-              <Ionicons name="time" size={16} color="#FF5A1F" style={{ marginRight: 8 }} />
-              <Text style={styles.featureItemText}>Check-in: 2:00 PM • Checkout: 11:00 AM</Text>
+          </View>
+
+          {/* Action Buttons: View Brochure & FAQ's */}
+          <View style={styles.actionButtonsRow}>
+            <TouchableOpacity
+              style={styles.orangeActionButton}
+              activeOpacity={0.88}
+              onPress={() => setIsBrochureOpen(true)}
+            >
+              <Text style={styles.orangeActionText}>View Brochure</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.faqActionButton}
+              activeOpacity={0.8}
+              onPress={() => setIsFaqOpen(true)}
+            >
+              <Text style={styles.faqActionText}>FAQ's</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ========================================================================= */}
+        {/* 6. PROPERTY EVENTS (Screenshot 2 & 3)                                    */}
+        {/* ========================================================================= */}
+        <View
+          onLayout={(e) => (sectionYPositions.current["events"] = e.nativeEvent.layout.y)}
+          style={styles.sectionContainer}
+        >
+          <View style={styles.sectionHeaderWithBadge}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.orangeBar} />
+              <Text style={styles.sectionHeading}>Property Events</Text>
             </View>
+            <View style={styles.liveCountBadge}>
+              <Text style={styles.liveCountText}>🔴 1 Event Live</Text>
+            </View>
+          </View>
+
+          {/* Event Card */}
+          <View style={styles.eventCard}>
+            <View style={styles.eventBannerContainer}>
+              <Image
+                source={{
+                  uri: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&q=80",
+                }}
+                style={styles.eventBannerImage}
+                contentFit="cover"
+              />
+              <LinearGradient
+                colors={["transparent", "rgba(0,0,0,0.88)"]}
+                style={styles.eventGradient}
+              >
+                {/* Top Badge */}
+                <View style={styles.eventTopBadge}>
+                  <Text style={styles.eventTopBadgeText}>🎉 bbq_night</Text>
+                </View>
+
+                {/* Bottom Title on Image */}
+                <Text style={styles.eventTitleOnImage}>
+                  Sunset Sundowner & Live Barbecue
+                </Text>
+                <View style={styles.eventDateRow}>
+                  <Ionicons name="calendar-outline" size={12} color="#FED7AA" style={{ marginRight: 4 }} />
+                  <Text style={styles.eventDateText}>13 Sept - 13 Oct 2026</Text>
+                </View>
+              </LinearGradient>
+            </View>
+
+            <View style={styles.eventBody}>
+              <Text style={styles.eventDescText}>
+                Exclusive poolside barbecue dinner with curated indie music for staying guests.
+              </Text>
+
+              <TouchableOpacity
+                style={styles.eventCtaButton}
+                activeOpacity={0.88}
+                onPress={() => setIsEventModalOpen(true)}
+              >
+                <Ionicons name="ticket-outline" size={16} color="#FBBF24" style={{ marginRight: 6 }} />
+                <Text style={styles.eventCtaText}>View Event Details & Inclusions</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* ========================================================================= */}
+        {/* 7. RULES AND REFUND POLICY (Screenshot 3 & 4)                            */}
+        {/* ========================================================================= */}
+        <View
+          onLayout={(e) => (sectionYPositions.current["refund"] = e.nativeEvent.layout.y)}
+          style={styles.sectionContainer}
+        >
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.orangeBar} />
+            <Text style={styles.sectionHeading}>Rules and Refund Policy</Text>
+          </View>
+
+          {/* 4-Card 2x2 Grid */}
+          <View style={styles.policyGrid}>
+            <View style={styles.policyGridCard}>
+              <Text style={styles.policyCardLabel}>🕒 CHECK-IN</Text>
+              <Text style={styles.policyCardValue}>1 PM</Text>
+            </View>
+
+            <View style={styles.policyGridCard}>
+              <Text style={styles.policyCardLabel}>🕒 CHECK-OUT</Text>
+              <Text style={styles.policyCardValue}>11 AM</Text>
+            </View>
+
+            <View style={styles.policyGridCard}>
+              <Text style={styles.policyCardLabel}>🛡️ SECURITY DEPOSIT</Text>
+              <Text style={styles.policyCardValue}>₹3,000</Text>
+              <Text style={styles.policyCardSub}>100% Refundable</Text>
+            </View>
+
+            <View style={styles.policyGridCard}>
+              <Text style={styles.policyCardLabel}>💵 LATE CHECKOUT</Text>
+              <Text style={styles.policyCardValue}>₹1,000/hr</Text>
+              <Text style={styles.policyCardSub}>Subject to slot</Text>
+            </View>
+          </View>
+
+          {/* Cancellation Policy Card */}
+          <View style={styles.ruleCard}>
+            <Text style={styles.ruleCardHeader}>• Cancellation Policy</Text>
+            <View style={styles.ruleBullet}>
+              <Text style={styles.bulletDot}>•</Text>
+              <Text style={styles.bulletText}>Advance Payment will be strictly non-refundable</Text>
+            </View>
+            <View style={styles.ruleBullet}>
+              <Text style={styles.bulletDot}>•</Text>
+              <Text style={styles.bulletText}>Advance payment is strictly non-refundable after 48 hours from booking</Text>
+            </View>
+            <View style={styles.ruleBullet}>
+              <Text style={styles.bulletDot}>•</Text>
+              <Text style={styles.bulletText}>Exceptions may be considered for genuine emergencies within 48 hours of booking</Text>
+            </View>
+          </View>
+
+          {/* House Rules Card */}
+          <View style={styles.ruleCard}>
+            <Text style={styles.ruleCardHeader}>• House Rules</Text>
+            <View style={styles.ruleBullet}>
+              <Text style={styles.bulletDot}>•</Text>
+              <Text style={styles.bulletText}>No smoking inside the villa</Text>
+            </View>
+            <View style={styles.ruleBullet}>
+              <Text style={styles.bulletDot}>•</Text>
+              <Text style={styles.bulletText}>Smoking allowed only in outdoor areas</Text>
+            </View>
+            <View style={styles.ruleBullet}>
+              <Text style={styles.bulletDot}>•</Text>
+              <Text style={styles.bulletText}>No parties or events without prior approval</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ========================================================================= */}
+        {/* 8. SPACES & LIVING AREAS (Screenshot 5)                                   */}
+        {/* ========================================================================= */}
+        <View
+          onLayout={(e) => (sectionYPositions.current["spaces"] = e.nativeEvent.layout.y)}
+          style={styles.sectionContainer}
+        >
+          <View style={styles.sectionHeaderWithBadge}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.orangeBar} />
+              <Text style={styles.sectionHeading}>Spaces & Living Areas</Text>
+            </View>
+            <Text style={styles.spacesCountText}>
+              {spaceCurrentIndex + 1} of {SAMPLE_SPACES.length}
+            </Text>
+          </View>
+
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(e) => {
+              const idx = Math.round(e.nativeEvent.contentOffset.x / (SCREEN_WIDTH * 0.85));
+              setSpaceCurrentIndex(Math.min(idx, SAMPLE_SPACES.length - 1));
+            }}
+            contentContainerStyle={styles.spacesScroll}
+          >
+            {SAMPLE_SPACES.map((space, idx) => (
+              <View key={idx} style={styles.spaceCard}>
+                <View style={styles.spaceImageContainer}>
+                  <Image
+                    source={{ uri: space.image }}
+                    style={styles.spaceImage}
+                    contentFit="cover"
+                  />
+                  {/* Category Badge */}
+                  <View style={styles.spaceCategoryBadge}>
+                    <Ionicons name="home-outline" size={11} color="#FF5A1F" style={{ marginRight: 4 }} />
+                    <Text style={styles.spaceCategoryText}>{space.category}</Text>
+                  </View>
+
+                  {/* View Photo Badge */}
+                  <View style={styles.viewPhotoBadge}>
+                    <Text style={styles.viewPhotoText}>View Photo</Text>
+                  </View>
+                </View>
+
+                <View style={styles.spaceContent}>
+                  <Text style={styles.spaceTitle}>{space.name}</Text>
+                  <Text style={styles.spaceDesc}>{space.description}</Text>
+
+                  <View style={styles.spaceTagsRow}>
+                    {space.features.map((f, i) => (
+                      <View key={i} style={styles.spaceTag}>
+                        <Text style={styles.spaceTagText}>✓ {f}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* ========================================================================= */}
+        {/* 9. GUEST REVIEWS (Screenshot 5)                                          */}
+        {/* ========================================================================= */}
+        <View
+          onLayout={(e) => (sectionYPositions.current["reviews"] = e.nativeEvent.layout.y)}
+          style={styles.sectionContainer}
+        >
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.orangeBar} />
+            <Text style={styles.sectionHeading}>Guest Reviews</Text>
+          </View>
+
+          {/* 5 Big Gold Stars Summary */}
+          <View style={styles.reviewsSummaryCenter}>
+            <View style={styles.starsRow}>
+              {[1, 2, 3, 4, 5].map((s) => (
+                <Ionicons key={s} name="star" size={26} color="#FBBF24" style={{ marginHorizontal: 2 }} />
+              ))}
+            </View>
+            <Text style={styles.bigScoreText}>5/5</Text>
+            <View style={styles.reviewPill}>
+              <Text style={styles.reviewPillText}>Guest Favourite</Text>
+            </View>
+          </View>
+
+          {/* Review Cards */}
+          <View style={styles.reviewsList}>
+            {SAMPLE_REVIEWS.map((rev) => (
+              <View key={rev.id} style={styles.reviewCard}>
+                <View style={styles.reviewerHeader}>
+                  <View style={styles.reviewerAvatar}>
+                    <Text style={styles.reviewerAvatarText}>{rev.avatar}</Text>
+                  </View>
+                  <View style={styles.reviewerInfo}>
+                    <Text style={styles.reviewerName}>{rev.name}</Text>
+                    <Text style={styles.reviewerDate}>{rev.date}</Text>
+                  </View>
+                  <View style={styles.reviewRatingStars}>
+                    {[...Array(rev.rating)].map((_, i) => (
+                      <Ionicons key={i} name="star" size={13} color="#FBBF24" />
+                    ))}
+                  </View>
+                </View>
+                <Text style={styles.reviewComment}>{rev.comment}</Text>
+              </View>
+            ))}
           </View>
         </View>
       </ScrollView>
 
       {/* ========================================================================= */}
-      {/* 6. FIXED BOTTOM BOOKING BAR (Matching FixedBookingBar.js Screenshot 2)    */}
+      {/* 10. FIXED BOTTOM BOOKING BAR                                              */}
       {/* ========================================================================= */}
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <View style={styles.bottomLeft}>
@@ -498,6 +913,81 @@ export default function PropertyDetailScreen() {
           </LinearGradient>
         </TouchableOpacity>
       </View>
+
+      {/* ========================================================================= */}
+      {/* MODALS: Brochure, FAQs, Event Inclusions                                 */}
+      {/* ========================================================================= */}
+      <Modal visible={isBrochureOpen} transparent animationType="slide">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{property.name} — Brochure</Text>
+              <TouchableOpacity onPress={() => setIsBrochureOpen(false)}>
+                <Ionicons name="close" size={22} color="#374151" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalContent}>
+              <Text style={styles.modalSectionLabel}>PROPERTY SNAPSHOT</Text>
+              <View style={styles.factGrid}>
+                <Text style={styles.factItem}>• BHK: 4BHK</Text>
+                <Text style={styles.factItem}>• Capacity: Up to {maxGuests} Guests</Text>
+                <Text style={styles.factItem}>• Bedrooms: {roomsCount} Rooms</Text>
+                <Text style={styles.factItem}>• Bathrooms: {bathsCount} Baths</Text>
+              </View>
+
+              <Text style={[styles.modalSectionLabel, { marginTop: 14 }]}>KEY FEATURES</Text>
+              <Text style={styles.featureLine}>• Private Swimming Pool with Sun Deck</Text>
+              <Text style={styles.featureLine}>• Dedicated In-House Chef & Caretaker</Text>
+              <Text style={styles.featureLine}>• Lush Lawn with Outdoor Seating</Text>
+              <Text style={styles.featureLine}>• Generator Power Backup & Optical Wi-Fi</Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={isFaqOpen} transparent animationType="slide">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Frequently Asked Questions</Text>
+              <TouchableOpacity onPress={() => setIsFaqOpen(false)}>
+                <Ionicons name="close" size={22} color="#374151" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalContent}>
+              <Text style={styles.faqQ}>Q: What is the check-in and check-out time?</Text>
+              <Text style={styles.faqA}>A: Check-in is at 1:00 PM and check-out is at 11:00 AM.</Text>
+
+              <Text style={styles.faqQ}>Q: Is self-cooking allowed in the kitchen?</Text>
+              <Text style={styles.faqA}>A: Yes, kitchen access is available with basic cookware and induction.</Text>
+
+              <Text style={styles.faqQ}>Q: Are pets allowed?</Text>
+              <Text style={styles.faqA}>A: Yes, friendly pets are warmly welcomed on the property.</Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={isEventModalOpen} transparent animationType="slide">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Event Inclusions & Details</Text>
+              <TouchableOpacity onPress={() => setIsEventModalOpen(false)}>
+                <Ionicons name="close" size={22} color="#374151" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalSectionLabel}>SUNSET SUNDOWNER & LIVE BARBECUE</Text>
+              <Text style={styles.featureLine}>• Live poolside charcoal grill setup</Text>
+              <Text style={styles.featureLine}>• Veg and Non-veg curated marinated starters</Text>
+              <Text style={styles.featureLine}>• Ambient acoustic / indie music playlist</Text>
+              <Text style={styles.featureLine}>• Included free with direct app booking</Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Floating AI Mascot */}
       <FloatingMascot />
@@ -937,13 +1427,22 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: "#FFFFFF",
   },
-  tabContentContainer: {
-    padding: 14,
+  sectionContainer: {
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
   },
-  experienceHeader: {
+  sectionHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 10,
+  },
+  sectionHeaderWithBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
   },
   orangeBar: {
     width: 4,
@@ -952,33 +1451,455 @@ const styles = StyleSheet.create({
     backgroundColor: "#FF5A1F",
     marginRight: 8,
   },
-  experienceTitle: {
-    fontSize: 15,
+  sectionHeading: {
+    fontSize: 16,
     fontWeight: "800",
     color: "#111827",
   },
-  experienceBody: {
-    fontSize: 13,
-    lineHeight: 20,
-    color: "#4B5563",
-    marginBottom: 16,
-  },
-  featureHighlights: {
-    backgroundColor: "#F9FAFB",
-    borderRadius: 12,
-    padding: 12,
+  signatureCardsScroll: {
     gap: 10,
+    paddingVertical: 4,
+  },
+  signatureCard: {
+    width: 170,
+    height: 110,
+    borderRadius: 14,
+    overflow: "hidden",
+    position: "relative",
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
-  featureItem: {
+  signatureCardImage: {
+    width: "100%",
+    height: "100%",
+  },
+  signatureGradient: {
+    position: "absolute",
+    inset: 0,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingBottom: 8,
+  },
+  signatureTitle: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+  signatureSub: {
+    color: "#D1D5DB",
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  subSectionHeader: {
     flexDirection: "row",
     alignItems: "center",
+    marginTop: 14,
+    marginBottom: 8,
   },
-  featureItemText: {
+  subSectionTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  highlightsList: {
+    gap: 8,
+  },
+  highlightCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 9,
+    borderRadius: 12,
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  highlightThumb: {
+    width: 52,
+    height: 52,
+    borderRadius: 8,
+    marginRight: 10,
+  },
+  highlightInfo: {
+    flex: 1,
+  },
+  highlightTitle: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "800",
+    color: "#111827",
+    marginBottom: 2,
+  },
+  highlightDesc: {
+    fontSize: 11,
+    color: "#6B7280",
+    lineHeight: 15,
+  },
+  descriptionParagraph: {
+    fontSize: 12,
+    color: "#4B5563",
+    lineHeight: 18,
+    marginBottom: 4,
+  },
+  readMoreText: {
+    color: "#FF5A1F",
+    fontSize: 12,
+    fontWeight: "800",
+    textDecorationLine: "underline",
+  },
+  tagChipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 14,
+  },
+  orangeTagChip: {
+    backgroundColor: "#FFF7ED",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  orangeTagText: {
+    color: "#EA580C",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  actionButtonsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  orangeActionButton: {
+    backgroundColor: "#FF5A1F",
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 10,
+  },
+  orangeActionText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  faqActionButton: {
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 10,
+  },
+  faqActionText: {
     color: "#374151",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  liveCountBadge: {
+    backgroundColor: "#FEE2E2",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  liveCountText: {
+    color: "#DC2626",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  eventCard: {
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
+  },
+  eventBannerContainer: {
+    width: "100%",
+    height: 160,
+    position: "relative",
+  },
+  eventBannerImage: {
+    width: "100%",
+    height: "100%",
+  },
+  eventGradient: {
+    position: "absolute",
+    inset: 0,
+    justifyContent: "space-between",
+    padding: 10,
+  },
+  eventTopBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255, 255, 255, 0.92)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  eventTopBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  eventTitleOnImage: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  eventDateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+  },
+  eventDateText: {
+    color: "#FED7AA",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  eventBody: {
+    padding: 12,
+  },
+  eventDescText: {
+    fontSize: 12,
+    color: "#4B5563",
+    lineHeight: 17,
+    marginBottom: 10,
+  },
+  eventCtaButton: {
+    backgroundColor: "#111827",
+    paddingVertical: 10,
+    borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  eventCtaText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  policyGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  policyGridCard: {
+    width: (SCREEN_WIDTH - 36) / 2,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    padding: 10,
+  },
+  policyCardLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#6B7280",
+    marginBottom: 4,
+  },
+  policyCardValue: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#111827",
+  },
+  policyCardSub: {
+    fontSize: 9,
+    color: "#9CA3AF",
+    marginTop: 1,
+  },
+  ruleCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    padding: 12,
+    marginBottom: 10,
+  },
+  ruleCardHeader: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#111827",
+    marginBottom: 6,
+  },
+  ruleBullet: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginTop: 3,
+  },
+  bulletDot: {
+    color: "#FF5A1F",
+    fontSize: 13,
+    fontWeight: "900",
+    marginRight: 6,
+  },
+  bulletText: {
+    flex: 1,
+    fontSize: 11,
+    color: "#4B5563",
+    lineHeight: 16,
+  },
+  spacesCountText: {
+    fontSize: 11,
+    color: "#9CA3AF",
+    fontWeight: "700",
+  },
+  spacesScroll: {
+    gap: 10,
+    paddingVertical: 4,
+  },
+  spaceCard: {
+    width: SCREEN_WIDTH * 0.78,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    overflow: "hidden",
+  },
+  spaceImageContainer: {
+    width: "100%",
+    height: 140,
+    position: "relative",
+  },
+  spaceImage: {
+    width: "100%",
+    height: "100%",
+  },
+  spaceCategoryBadge: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.94)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  spaceCategoryText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  viewPhotoBadge: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  viewPhotoText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  spaceContent: {
+    padding: 10,
+  },
+  spaceTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  spaceDesc: {
+    fontSize: 11,
+    color: "#6B7280",
+    marginTop: 2,
+    marginBottom: 6,
+  },
+  spaceTagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+  },
+  spaceTag: {
+    backgroundColor: "#F3F4F6",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  spaceTagText: {
+    fontSize: 9,
+    color: "#374151",
+    fontWeight: "600",
+  },
+  reviewsSummaryCenter: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+  },
+  starsRow: {
+    flexDirection: "row",
+    marginBottom: 4,
+  },
+  bigScoreText: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#111827",
+    marginBottom: 4,
+  },
+  reviewPill: {
+    backgroundColor: "#FFF7ED",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    marginBottom: 12,
+  },
+  reviewPillText: {
+    color: "#C2410C",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  reviewsList: {
+    gap: 10,
+  },
+  reviewCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    padding: 12,
+  },
+  reviewerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  reviewerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#FF5A1F",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  reviewerAvatarText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  reviewerInfo: {
+    flex: 1,
+  },
+  reviewerName: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  reviewerDate: {
+    fontSize: 10,
+    color: "#9CA3AF",
+  },
+  reviewRatingStars: {
+    flexDirection: "row",
+  },
+  reviewComment: {
+    fontSize: 12,
+    color: "#4B5563",
+    lineHeight: 17,
   },
   bottomBar: {
     position: "absolute",
@@ -1053,5 +1974,70 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "800",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalCard: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 16,
+    maxHeight: "80%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  modalTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  modalContent: {
+    paddingVertical: 6,
+  },
+  modalSectionLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#FF5A1F",
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  factGrid: {
+    backgroundColor: "#F9FAFB",
+    padding: 10,
+    borderRadius: 10,
+    gap: 4,
+  },
+  factItem: {
+    fontSize: 12,
+    color: "#374151",
+    fontWeight: "600",
+  },
+  featureLine: {
+    fontSize: 12,
+    color: "#4B5563",
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  faqQ: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#111827",
+    marginTop: 8,
+  },
+  faqA: {
+    fontSize: 11,
+    color: "#4B5563",
+    marginTop: 2,
+    marginBottom: 4,
   },
 });
