@@ -27,8 +27,8 @@ const CATEGORIES = [
     image: require("../../assets/brand/Villabanner.jpg"),
   },
   {
-    id: "camp",
-    slug: "camp",
+    id: "camping",
+    slug: "camping",
     name: "Camp",
     subtitle: "Lakeside Glamping & Bonfires",
     tag1: "CURATED",

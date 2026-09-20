@@ -21,7 +21,7 @@ import { useSearch } from "../../context/SearchContext";
 const CATEGORY_CHIPS = [
   { id: "all", name: "All Stays", icon: "sparkles" },
   { id: "villa", name: "Villas", icon: "home" },
-  { id: "camp", name: "Camps", icon: "bonfire" },
+  { id: "camping", name: "Camps", icon: "bonfire" },
   { id: "cottage", name: "Cottages", icon: "leaf" },
   { id: "hotel", name: "Hotels", icon: "business" },
 ];
