@@ -1,20 +1,5 @@
-import { Text, View, StyleSheet } from "react-native";
-import { StatusBar } from "expo-status-bar";
+import { Redirect } from "expo-router";
 
-export default function Index() {
-  return (
-    <View style={styles.container}>
-      <StatusBar style="dark" animated />
-
-      <Text  >Edit src/app/index.tsx to edit this screen.</Text>
-    </View>
-  );
+export default function RootIndex() {
+  return <Redirect href={"/(tabs)" as any} />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});
