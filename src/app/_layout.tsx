@@ -36,6 +36,10 @@ export default function RootLayout() {
                 options={{ headerShown: false, animation: "fade" }}
               />
               <Stack.Screen
+                name="search-your-gateway"
+                options={{ headerShown: false, animation: "slide_from_right" }}
+              />
+              <Stack.Screen
                 name="modal/search"
                 options={{
                   presentation: "modal",

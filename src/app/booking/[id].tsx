@@ -77,7 +77,7 @@ export default function BookingScreen() {
   };
 
   const basePricePerNight =
-    property?.price ||
+    (typeof property?.price === "number" ? property.price : null) ||
     property?.basePrice ||
     property?.pricing?.basePrice ||
     14000;
